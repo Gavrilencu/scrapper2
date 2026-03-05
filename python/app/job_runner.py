@@ -2,6 +2,7 @@ import re
 import json
 import traceback
 from datetime import datetime
+from typing import Any
 from app.database import get_db, get_setting
 from app.oracle_client import build_connect_string, run_script
 from app.scraper import extract_with_config
@@ -26,14 +27,25 @@ def get_datetime_placeholders(dt: datetime | None = None) -> dict[str, str]:
     }
 
 
+def _script_value(key: str, value: Any) -> str:
+    """Valoare pentru substituție în script: evită ORA-00936 (expression missing) când e goală."""
+    if value is not None and str(value).strip() != "":
+        return str(value).replace("'", "''")
+    key_lower = key.lower()
+    if key_lower in ("valabile_din", "data", "date", "arcdate") or "date" in key_lower or "data" in key_lower or "din" in key_lower:
+        return "01.01.1900"
+    return "NULL"
+
+
 def substitute_in_script(script: str, row: dict) -> str:
     dt_placeholders = get_datetime_placeholders()
     combined = {**row, **dt_placeholders}
     out = script
     for key, value in combined.items():
-        safe = str(value).replace("'", "''") if value is not None else ""
+        safe = _script_value(key, value)
         out = re.sub(r"\{\{\s*" + re.escape(key) + r"\s*\}\}", safe, out, flags=re.IGNORECASE)
-        out = re.sub(rf":{re.escape(key)}\b", f"'{safe}'", out, flags=re.IGNORECASE)
+        quoted = safe if safe == "NULL" else f"'{safe}'"
+        out = re.sub(rf":{re.escape(key)}\b", quoted, out, flags=re.IGNORECASE)
     return out
 
 

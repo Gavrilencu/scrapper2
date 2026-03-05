@@ -89,11 +89,15 @@ def extract_with_config(
         try:
             page = browser.new_page()
             page.goto(url, wait_until="networkidle", timeout=30000)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(2000)
 
             if fields_cfg:
                 if row_selector:
                     loc = page.locator(f"xpath={row_selector}" if _is_xpath(row_selector) else row_selector)
+                    try:
+                        loc.first.wait_for(state="visible", timeout=10000)
+                    except Exception:
+                        pass
                     count = loc.count()
                     for i in range(count):
                         row_el = loc.nth(i)
@@ -104,10 +108,14 @@ def extract_with_config(
                                 continue
                             loc_opt = f"xpath={sel}" if _is_xpath(sel) else sel
                             try:
-                                text = row_el.locator(loc_opt).first.text_content()
+                                cell_loc = row_el.locator(loc_opt).first
+                                text = cell_loc.text_content(timeout=3000)
                                 row[var] = (text or "").strip()
                             except Exception:
-                                row[var] = ""
+                                try:
+                                    row[var] = (row_el.locator(loc_opt).first.inner_text() or "").strip()
+                                except Exception:
+                                    row[var] = ""
                         all_rows.append(row)
                 else:
                     row = {}
@@ -117,10 +125,13 @@ def extract_with_config(
                             continue
                         loc_opt = f"xpath={sel}" if _is_xpath(sel) else sel
                         try:
-                            text = page.locator(loc_opt).first.text_content()
+                            text = page.locator(loc_opt).first.text_content(timeout=3000)
                             row[var] = (text or "").strip()
                         except Exception:
-                            row[var] = ""
+                            try:
+                                row[var] = (page.locator(loc_opt).first.inner_text() or "").strip()
+                            except Exception:
+                                row[var] = ""
                     all_rows.append(row)
 
             for table in tables_cfg:
