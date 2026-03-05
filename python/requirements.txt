@@ -7,7 +7,7 @@ playwright==1.49.0
 apscheduler==3.10.4
 itsdangerous==2.2.0
 python-dotenv==1.0.1
-beautifulsoup4==4.12.3
+beautifulsoup4>=4.13.0,<4.14
 requests==2.32.3
 lxml==5.3.0
 cssselect==1.2.0
