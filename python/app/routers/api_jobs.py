@@ -204,10 +204,13 @@ def delete_job(id: int):
 def run_job_api(id: int):
     try:
         result = run_job(id)
+        success = result["success"]
+        err = result.get("error") if not success else None
         return {
-            "success": result["success"],
+            "success": success,
             "rowsInserted": result.get("rowsInserted", 0),
-            "error": result.get("error"),
+            "error": (err or "Eroare necunoscută") if not success else None,
         }
     except Exception as e:
-        return {"success": False, "rowsInserted": 0, "error": str(e)}
+        msg = str(e).strip() or "Eroare necunoscută"
+        return {"success": False, "rowsInserted": 0, "error": msg}

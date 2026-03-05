@@ -2,12 +2,22 @@ import json
 from typing import Any
 from playwright.sync_api import sync_playwright
 
+# Argumente pentru rulare pe server Linux fără interfață grafică (headless)
+_CHROMIUM_HEADLESS_ARGS = [
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--disable-software-rasterizer",
+    "--disable-setuid-sandbox",
+]
+
 
 def analyze_page(url: str, proxy: dict | None = None) -> list[dict]:
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
             proxy=proxy or None,
+            args=_CHROMIUM_HEADLESS_ARGS,
         )
         try:
             page = browser.new_page()
@@ -74,6 +84,7 @@ def extract_with_config(
         browser = p.chromium.launch(
             headless=True,
             proxy=proxy or None,
+            args=_CHROMIUM_HEADLESS_ARGS,
         )
         try:
             page = browser.new_page()

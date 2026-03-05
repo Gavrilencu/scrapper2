@@ -50,9 +50,15 @@
       running = id;
       btn.disabled = true;
       const r = await fetch(`/api/jobs/${id}/run`, { method: 'POST' });
-      const data = await r.json();
+      let data = {};
+      try { data = await r.json(); } catch (_) { data = {}; }
       running = null;
       btn.disabled = false;
+      if (!r.ok) {
+        const msg = data.detail || data.error || (Array.isArray(data.detail) ? data.detail.map(d => d.msg || d).join('; ') : r.statusText) || 'Eroare necunoscută';
+        alert('Eroare: ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)));
+        return;
+      }
       alert(data.success ? `Succes. Rânduri inserate: ${data.rowsInserted}` : ('Eroare: ' + (data.error || 'necunoscută')));
       if (data.success) location.reload();
     });

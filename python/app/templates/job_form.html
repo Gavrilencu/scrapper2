@@ -324,8 +324,14 @@ if (jobId) {
   document.getElementById('btnRun').addEventListener('click', async () => {
     document.getElementById('btnRun').disabled = true;
     const r = await fetch(`/api/jobs/${jobId}/run`, { method: 'POST' });
-    const data = await r.json();
+    let data = {};
+    try { data = await r.json(); } catch (_) { data = {}; }
     document.getElementById('btnRun').disabled = false;
+    if (!r.ok) {
+      const msg = data.detail || data.error || (Array.isArray(data.detail) ? data.detail.map(d => d.msg || d).join('; ') : r.statusText) || 'Eroare la rulare';
+      alert('Eroare: ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)));
+      return;
+    }
     alert(data.success ? `Succes. Rânduri inserate: ${data.rowsInserted}` : (data.error || 'Eroare la rulare'));
   });
 }

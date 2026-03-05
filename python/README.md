@@ -17,6 +17,19 @@ Aceeași aplicație Scrapper Pro rescrisă în Python: extragere date din pagini
 - Pentru Oracle: driver `oracledb` (mod thin, fără Oracle Client)
 - Playwright: după `pip install` rulați `playwright install chromium`
 
+## Rulare pe server Linux (fără interfață grafică)
+
+Aplicația folosește Playwright în mod **headless** (fără display). Pe un server Linux fără GUI:
+
+```bash
+pip install -r requirements.txt
+playwright install chromium
+# Instalare dependențe de sistem pentru Chromium headless (libs, fonts etc.):
+playwright install-deps chromium
+```
+
+Apoi porniți aplicația ca de obicei (ex. `uvicorn app.main:app --host 0.0.0.0 --port 8000`). Chromium rulează cu `--no-sandbox`, `--disable-gpu`, `--disable-dev-shm-usage` etc., potrivit pentru mediu server.
+
 ## Instalare
 
 ```bash
