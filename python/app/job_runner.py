@@ -92,8 +92,9 @@ def run_job(job_id: int) -> dict:
                 extraction_config = json.loads(job["extraction_config"])
             use_proxy = job.get("use_proxy", 0) != 0
             proxy_cfg = get_proxy_config() if use_proxy else None
+            job_engine = (job.get("scraper_engine") or "").strip().lower() or None
             rows = (
-                extract_with_config(job["url"], extraction_config, proxy_cfg)
+                extract_with_config(job["url"], extraction_config, proxy_cfg, engine=job_engine)
                 if extraction_config
                 else []
             )

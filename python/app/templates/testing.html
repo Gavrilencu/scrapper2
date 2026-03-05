@@ -13,9 +13,9 @@
       <input id="testUrl" class="input font-mono" type="url" placeholder="https://example.com/pagina" required>
     </div>
     <div>
-      <label class="label">Selector (XPath sau CSS)</label>
-      <input id="testSelector" class="input font-mono" placeholder="ex: //h1/text() sau div.title sau //span[@class='pret']" required>
-      <p class="text-muted mt-1" style="font-size:0.75rem;">XPath: începe cu / sau (.  CSS: ex. div.clasa, #id, table td.</p>
+      <label class="label">Selector (XPath, Full XPath sau CSS)</label>
+      <input id="testSelector" class="input font-mono" placeholder="ex: //h1 | /html/body/div[1]/span | div.title" required>
+      <p class="text-muted mt-1" style="font-size:0.75rem;">Playwright acceptă <strong>Full XPath</strong> (Copy full XPath din Chrome). XPath: începe cu / sau //. CSS: div.clasa, #id.</p>
     </div>
     <div>
       <label class="label">Metodă</label>
@@ -89,7 +89,8 @@
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
-        errorEl.textContent = data.detail || data.message || 'Eroare la request.';
+        const msg = Array.isArray(data.detail) ? (data.detail[0]?.msg || JSON.stringify(data.detail)) : (data.detail || data.message || 'Eroare la request.');
+        errorEl.textContent = msg;
         errorEl.style.display = 'block';
         resultCard.style.display = 'none';
         return;

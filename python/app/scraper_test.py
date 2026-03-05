@@ -15,11 +15,51 @@ _CHROMIUM_HEADLESS_ARGS = [
 
 def _is_xpath(selector: str) -> bool:
     s = (selector or "").strip()
-    return s.startswith("/") or s.startswith("(.") or s.startswith("xpath=")
+    if not s:
+        return False
+    # Full XPath (ex: /html/body/div[1]), XPath relativ (//div), sau prefix xpath=
+    return s.startswith("/") or s.startswith("(.") or s.lower().startswith("xpath=")
+
+
+def _xpath_strip_prefix(selector: str) -> str:
+    """Elimină prefixul 'xpath=' dacă există, pentru document.evaluate."""
+    s = (selector or "").strip()
+    if s.lower().startswith("xpath="):
+        return s[6:].strip()
+    return s
+
+
+# JavaScript rulat în browser pentru XPath – același motor ca în Chrome (Copy full XPath).
+_JS_XPATH_EXTRACT = """
+(xpath) => {
+  const out = [];
+  try {
+    const result = document.evaluate(
+      xpath,
+      document,
+      null,
+      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+      null
+    );
+    for (let i = 0; i < result.snapshotLength; i++) {
+      const node = result.snapshotItem(i);
+      if (!node) { out.push(''); continue; }
+      if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
+        out.push((node.nodeValue || '').trim());
+      } else {
+        out.push((node.textContent || '').trim());
+      }
+    }
+  } catch (e) {
+    return { error: e.message };
+  }
+  return out;
+}
+"""
 
 
 def test_extract_playwright(url: str, selector: str, proxy: dict | None = None) -> list[str]:
-    """Extrage toate textele care se potrivesc selectorului (XPath sau CSS). Rulează JavaScript."""
+    """Extrage toate textele: XPath (inclusiv full XPath ca în Chrome) sau CSS. Rulează JavaScript."""
     from playwright.sync_api import sync_playwright
 
     selector = (selector or "").strip()
@@ -34,37 +74,39 @@ def test_extract_playwright(url: str, selector: str, proxy: dict | None = None) 
         )
         try:
             page = browser.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=45000)
-            page.wait_for_timeout(2500)
+            # load = așteaptă evenimentul load (mai robust decât networkidle pe site-uri cu multe request-uri)
+            page.goto(url, wait_until="load", timeout=60000)
+            page.wait_for_timeout(5000)
 
             if _is_xpath(selector):
-                locator = page.locator(f"xpath={selector}")
+                xpath_clean = _xpath_strip_prefix(selector)
+                # Folosim document.evaluate în pagină – compatibil cu „Copy full XPath” din Chrome
+                out = page.evaluate(_JS_XPATH_EXTRACT, xpath_clean)
+                if isinstance(out, dict) and "error" in out:
+                    raise ValueError(out["error"])
+                return [str(v).strip() for v in (out or [])]
             else:
+                # CSS: locator + listă de text
                 locator = page.locator(selector)
-
-            try:
-                locator.first.wait_for(state="attached", timeout=8000)
-            except Exception:
-                pass
-
-            n = locator.count()
-            result: list[str] = []
-            for i in range(n):
                 try:
-                    el = locator.nth(i)
-                    text = el.inner_text(timeout=2000)
-                    result.append((text or "").strip())
+                    locator.first.wait_for(state="visible", timeout=10000)
                 except Exception:
+                    pass
+                n = locator.count()
+                result: list[str] = []
+                for i in range(n):
                     try:
-                        text = locator.nth(i).text_content(timeout=2000)
+                        text = locator.nth(i).inner_text(timeout=3000)
                         result.append((text or "").strip())
                     except Exception:
-                        result.append("")
+                        try:
+                            text = locator.nth(i).text_content(timeout=3000)
+                            result.append((text or "").strip())
+                        except Exception:
+                            result.append("")
+                return result
+        finally:
             browser.close()
-            return result
-        except Exception:
-            browser.close()
-            raise
 
 
 def test_extract_bs4(url: str, selector: str, proxy: dict | None = None) -> list[str]:

@@ -25,6 +25,15 @@
         <button type="button" id="btnAnalyze" class="btn btn-secondary">Analizează</button>
       </div>
     </div>
+    <div>
+      <label class="label">Metodă extragere (acest job)</label>
+      <select id="scraper_engine" class="input">
+        <option value="playwright">Playwright (JavaScript + XPath/CSS)</option>
+        <option value="lxml">Lxml (HTML static, XPath/CSS)</option>
+        <option value="beautifulsoup">Beautiful Soup (HTML static, doar CSS)</option>
+      </select>
+      <p class="text-muted mt-1" style="font-size:0.75rem;">Alege cum se extrag datele doar pentru acest job.</p>
+    </div>
     <div style="grid-column:1/-1;">
       <label class="label">Programare (cron)</label>
       <div id="schedulePicker"></div>
@@ -203,7 +212,9 @@ async function loadJob() {
   document.getElementById('success_recipients').value = j.success_recipients || '';
   document.getElementById('error_recipients').value = j.error_recipients || '';
   document.getElementById('active').checked = !!j.active;
-   document.getElementById('use_proxy').checked = !!j.use_proxy;
+  document.getElementById('use_proxy').checked = !!j.use_proxy;
+  const engineVal = (j.scraper_engine || 'playwright').toLowerCase();
+  if (['playwright','beautifulsoup','lxml'].includes(engineVal)) document.getElementById('scraper_engine').value = engineVal;
   if (j.extraction_config) {
     extractionConfig = typeof j.extraction_config === 'string' ? JSON.parse(j.extraction_config) : j.extraction_config;
     customFields = (extractionConfig.fields || []).map(f => ({ selector: f.selector || '', variable: f.variable || '' }));
@@ -221,7 +232,8 @@ document.getElementById('btnAnalyze').addEventListener('click', async () => {
   document.getElementById('btnAnalyze').disabled = true;
   document.getElementById('btnAnalyze').textContent = 'Analizez...';
   try {
-    const r = await fetch('/api/scrape/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+    const engine = document.getElementById('scraper_engine').value || 'playwright';
+    const r = await fetch('/api/scrape/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, engine }) });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || data.error || 'Eroare analiză');
     detectedTables = data.tables || [];
@@ -302,6 +314,7 @@ document.getElementById('btnSave').addEventListener('click', async () => {
     before_insert_script: document.getElementById('before_insert_script').value || null,
     use_before_insert: document.getElementById('use_before_insert').checked,
     use_proxy: document.getElementById('use_proxy').checked,
+    scraper_engine: document.getElementById('scraper_engine').value || 'playwright',
     email_on_success: document.getElementById('email_on_success').checked,
     email_on_error: document.getElementById('email_on_error').checked,
     success_recipients: document.getElementById('success_recipients').value || null,

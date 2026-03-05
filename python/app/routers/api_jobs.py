@@ -20,6 +20,7 @@ class JobCreate(BaseModel):
     before_insert_script: str | None = None
     use_before_insert: bool = True
     use_proxy: bool = False
+    scraper_engine: str = "playwright"  # playwright | beautifulsoup | lxml
     email_on_success: bool = True
     email_on_error: bool = True
     success_recipients: str | None = None
@@ -38,6 +39,7 @@ class JobUpdate(BaseModel):
     before_insert_script: str | None = None
     use_before_insert: bool | None = None
     use_proxy: bool | None = None
+    scraper_engine: str | None = None
     email_on_success: bool | None = None
     email_on_error: bool | None = None
     success_recipients: str | None = None
@@ -73,11 +75,14 @@ def create_job(body: JobCreate):
     db = get_db()
     try:
         ext = json.dumps(body.extraction_config) if body.extraction_config else None
+        engine = (body.scraper_engine or "playwright").strip().lower()
+        if engine not in ("playwright", "beautifulsoup", "lxml"):
+            engine = "playwright"
         cur = db.execute("""
             INSERT INTO jobs (name, connection_id, email_config_id, url, cron_expression,
                 extraction_config, insert_script, before_insert_script, use_before_insert, use_proxy,
-                email_on_success, email_on_error, success_recipients, error_recipients, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                scraper_engine, email_on_success, email_on_error, success_recipients, error_recipients, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             body.name,
             body.connection_id,
@@ -89,6 +94,7 @@ def create_job(body: JobCreate):
             body.before_insert_script,
             1 if body.use_before_insert else 0,
             1 if body.use_proxy else 0,
+            engine,
             1 if body.email_on_success else 0,
             1 if body.email_on_error else 0,
             body.success_recipients,
@@ -158,11 +164,15 @@ def update_job(id: int, body: JobUpdate):
         success_recipients = body.success_recipients if body.success_recipients is not None else existing["success_recipients"]
         error_recipients = body.error_recipients if body.error_recipients is not None else existing["error_recipients"]
         active = body.active if body.active is not None else (existing.get("active", 1) != 0)
+        scraper_engine = body.scraper_engine if body.scraper_engine is not None else (existing.get("scraper_engine") or "playwright")
+        scraper_engine = (scraper_engine or "playwright").strip().lower()
+        if scraper_engine not in ("playwright", "beautifulsoup", "lxml"):
+            scraper_engine = "playwright"
 
         db.execute("""
             UPDATE jobs SET name=?, connection_id=?, email_config_id=?, url=?, cron_expression=?,
                 extraction_config=?, insert_script=?, before_insert_script=?, use_before_insert=?, use_proxy=?,
-                email_on_success=?, email_on_error=?, success_recipients=?, error_recipients=?, active=?,
+                scraper_engine=?, email_on_success=?, email_on_error=?, success_recipients=?, error_recipients=?, active=?,
                 updated_at=CURRENT_TIMESTAMP WHERE id=?
         """, (
             name,
@@ -175,6 +185,7 @@ def update_job(id: int, body: JobUpdate):
             before_insert_script,
             1 if use_before_insert else 0,
             1 if use_proxy else 0,
+            scraper_engine,
             1 if email_on_success else 0,
             1 if email_on_error else 0,
             success_recipients,

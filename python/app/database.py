@@ -90,6 +90,8 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE jobs ADD COLUMN use_before_insert INTEGER DEFAULT 1")
             if "use_proxy" not in cols:
                 conn.execute("ALTER TABLE jobs ADD COLUMN use_proxy INTEGER DEFAULT 0")
+            if "scraper_engine" not in cols:
+                conn.execute("ALTER TABLE jobs ADD COLUMN scraper_engine TEXT DEFAULT 'playwright'")
         except Exception:
             pass
         # Default: motor scraping = playwright

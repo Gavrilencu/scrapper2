@@ -9,6 +9,7 @@ router = APIRouter(tags=["scrape"])
 
 class AnalyzeBody(BaseModel):
     url: str
+    engine: str | None = None  # playwright | beautifulsoup | lxml – pentru analiză cu aceeași metodă ca job-ul
 
 
 class ExtractBody(BaseModel):
@@ -28,7 +29,8 @@ def analyze(body: AnalyzeBody):
     if not body.url:
         raise HTTPException(400, "URL lipsă")
     try:
-        tables = analyze_page(body.url)
+        engine = (body.engine or "").strip().lower() or None
+        tables = analyze_page(body.url, proxy=None, engine=engine)
         return {"tables": tables}
     except Exception as e:
         raise HTTPException(500, str(e))
