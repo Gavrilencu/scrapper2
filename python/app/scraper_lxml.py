@@ -39,29 +39,64 @@ def _get_tree(url: str, proxy: dict | None = None):
 
 
 def _xpath_without_tbody(xpath: str) -> str:
-    """Transformă XPath copiat din browser (cu tbody) în variantă validă pentru lxml (fără tbody implicit).
-    În browser există table > tbody > tr; lxml poate avea table > tr. Eliminăm doar nivelul /tbody/ din cale."""
+    """Transformă XPath copiat din browser (cu tbody) în variantă validă pentru lxml (fără tbody implicit)."""
     if not xpath or "/tbody" not in xpath:
         return xpath
-    # /tbody/ -> /  (table/tbody/tr -> table/tr); /tbody la final -> eliminat
     s = xpath.replace("/tbody/", "/")
     if s.endswith("/tbody"):
         s = s[:-6]
     return s
 
 
+def _xpath_table_as_descendant(xpath: str) -> str:
+    """Când tabelul nu e copil direct (ex. #id > div > table[2]), /table[N] nu găsește nimic. Încercăm //table[N] (descendent)."""
+    if not xpath or "]/table[" not in xpath:
+        return xpath
+    return xpath.replace("]/table[", "]//table[", 1)
+
+
+def _xpath_id_on_table(xpath: str) -> str | None:
+    """Dacă id-ul e pe tabel (ex. <table id="base-rates-table">), path-ul din Chrome poate avea /table[2]/ deși e un singur tabel. Încercăm fără /table[N]/."""
+    if not xpath or "]/table[" not in xpath or "@id=" not in xpath:
+        return None
+    # elimină /table[1]/ sau /table[2]/ etc. după ] (după predicate)
+    s = re.sub(r"\]/table\[\d+\]/", "]/", xpath, count=1)
+    return s if s != xpath else None
+
+
+def _xpath_fallbacks_for_table(selector: str) -> list[str]:
+    """Generează variante de XPath pentru extragere din tabele (Copy XPath din Chrome)."""
+    sel = (selector or "").strip()
+    if not sel or not _is_xpath(sel):
+        return [sel]
+    out = [sel]
+    without_tbody = _xpath_without_tbody(sel)
+    if without_tbody != sel:
+        out.append(without_tbody)
+    base = without_tbody or sel
+    # tabel nu e copil direct: ]/table[ -> ]//table[
+    if "]/table[" in base:
+        desc = _xpath_table_as_descendant(base)
+        if desc != base:
+            out.append(desc)
+    # id pe tabel: elimină /table[N]/ și ia primul tr/td
+    id_on_table = _xpath_id_on_table(base)
+    if id_on_table and id_on_table not in out:
+        out.append(id_on_table)
+    return out
+
+
 def _nodes_for_selector(root, selector: str):
-    """Returnează listă de noduri pentru selector (XPath sau CSS). Pentru XPath, dacă nu găsește nimic și path-ul conține tbody, încearcă fără tbody (compatibil cu Copy XPath din Chrome)."""
+    """Returnează listă de noduri pentru selector (XPath sau CSS). Pentru XPath din tabele, încearcă mai multe variante (fără tbody, table ca descendent)."""
     sel = (selector or "").strip()
     if not sel:
         return []
     if _is_xpath(selector):
-        nodes = root.xpath(sel)
-        if not nodes and "/tbody" in sel:
-            fallback = _xpath_without_tbody(sel)
-            if fallback != sel:
-                nodes = root.xpath(fallback)
-        return nodes
+        for xpath_try in _xpath_fallbacks_for_table(sel):
+            nodes = root.xpath(xpath_try)
+            if nodes:
+                return nodes
+        return []
     try:
         return list(cssselect.CSSSelector(sel)(root))
     except Exception:

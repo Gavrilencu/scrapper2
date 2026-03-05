@@ -146,7 +146,7 @@ def test_extract_lxml(url: str, selector: str, proxy: dict | None = None) -> lis
     """Extrage texte cu lxml – XPath sau CSS pe HTML static (fără JavaScript)."""
     import requests
     from lxml import html
-    from app.scraper_lxml import _xpath_without_tbody
+    from app.scraper_lxml import _xpath_fallbacks_for_table
 
     selector = (selector or "").strip()
     if not selector:
@@ -167,9 +167,11 @@ def test_extract_lxml(url: str, selector: str, proxy: dict | None = None) -> lis
     result: list[str] = []
     try:
         if _is_xpath(selector):
-            nodes = tree.xpath(selector)
-            if not nodes and "/tbody" in selector:
-                nodes = tree.xpath(_xpath_without_tbody(selector))
+            nodes = []
+            for xpath_try in _xpath_fallbacks_for_table(selector):
+                nodes = tree.xpath(xpath_try)
+                if nodes:
+                    break
         else:
             from lxml import cssselect
             nodes = cssselect.CSSSelector(selector)(tree)
