@@ -40,6 +40,18 @@
 </div>
 
 <div class="card mb-6">
+  <h2 class="text-white mb-4" style="font-size:1.125rem;font-weight:600;">XPath / CSS → variabile</h2>
+  <p class="text-muted mb-4" style="font-size:0.875rem;">Definește selectoare (XPath sau CSS) și numele variabilei. În scripturi folosești <code style="background:#1e293b;padding:0 0.25rem;border-radius:0.25rem;">{{'{{nume_variabilă}}'}}</code>. Cu Playwright poți folosi XPath (ex: <code style="background:#1e293b;padding:0 0.25rem;">//span[@class='price']</code>) sau CSS. Cu Beautiful Soup doar CSS.</p>
+  <div class="mb-4">
+    <label class="label">Selector rânduri (opțional)</label>
+    <input id="rowSelector" class="input font-mono" style="font-size:0.875rem;" placeholder="ex: //table/tbody/tr sau table tbody tr">
+    <p class="text-muted mt-1" style="font-size:0.75rem;">Dacă completezi, se generează un rând per element găsit; selectoarele de mai jos sunt relative la fiecare rând.</p>
+  </div>
+  <div id="customFieldsContainer" class="space-y-2 mb-4"></div>
+  <button type="button" id="btnAddField" class="btn btn-secondary">+ Adaugă câmp (XPath/CSS → variabilă)</button>
+</div>
+
+<div class="card mb-6">
   <h2 class="text-white mb-4" style="font-size:1.125rem;font-weight:600;">Script verificare (înainte de inserare)</h2>
   <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:0.5rem;">
     <input type="checkbox" id="use_before_insert" checked>
@@ -96,6 +108,43 @@ let cronExpression = '0 9 * * *';
 let detectedTables = [];
 let selectedTableConfig = {};
 let extractionConfig = null;
+let customFields = [];
+let rowSelector = '';
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : s;
+  return d.innerHTML;
+}
+
+function renderCustomFields() {
+  const container = document.getElementById('customFieldsContainer');
+  container.innerHTML = customFields.map((f, i) => `
+    <div class="flex gap-2 items-center" data-field-idx="${i}">
+      <input class="input flex-1 font-mono" style="font-size:0.875rem;" data-field="selector" placeholder="XPath sau CSS (ex: //span[@class='price'] sau .preț)" value="${escapeHtml(f.selector)}">
+      <input class="input font-mono" style="width:10rem;font-size:0.875rem;" data-field="variable" placeholder="Variabilă" value="${escapeHtml(f.variable)}">
+      <button type="button" class="btn p-2" style="color:#f87171;" data-remove data-idx="${i}" title="Șterge">✕</button>
+    </div>
+  `).join('');
+  container.querySelectorAll('input[data-field="selector"]').forEach((inp, i) => {
+    inp.addEventListener('input', () => { customFields[i].selector = inp.value; });
+  });
+  container.querySelectorAll('input[data-field="variable"]').forEach((inp, i) => {
+    inp.addEventListener('input', () => { customFields[i].variable = inp.value; });
+  });
+  container.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-idx'), 10);
+      customFields = customFields.filter((_, j) => j !== idx);
+      renderCustomFields();
+    });
+  });
+}
+
+document.getElementById('btnAddField').addEventListener('click', () => {
+  customFields.push({ selector: '', variable: '' });
+  renderCustomFields();
+});
 
 async function loadOptions() {
   const [connections, emailConfigs] = await Promise.all([
@@ -147,7 +196,13 @@ async function loadJob() {
   document.getElementById('success_recipients').value = j.success_recipients || '';
   document.getElementById('error_recipients').value = j.error_recipients || '';
   document.getElementById('active').checked = !!j.active;
-  if (j.extraction_config) extractionConfig = typeof j.extraction_config === 'string' ? JSON.parse(j.extraction_config) : j.extraction_config;
+  if (j.extraction_config) {
+    extractionConfig = typeof j.extraction_config === 'string' ? JSON.parse(j.extraction_config) : j.extraction_config;
+    customFields = (extractionConfig.fields || []).map(f => ({ selector: f.selector || '', variable: f.variable || '' }));
+    rowSelector = extractionConfig.rowSelector || '';
+    document.getElementById('rowSelector').value = rowSelector;
+    renderCustomFields();
+  }
   renderSchedulePicker();
 }
 
@@ -212,14 +267,22 @@ function buildExtractionConfig() {
     const t = detectedTables.find(d => d.id === id);
     return { id, selector: t?.selector || 'table', type: t?.type || 'html_table', columns: columns.filter(c => c.source) };
   });
-  return { tables: tables.length ? tables : undefined, fields: undefined, rowSelector: undefined };
+  const fields = customFields.filter(f => (f.selector || '').trim() && (f.variable || '').trim());
+  const rowSel = (document.getElementById('rowSelector').value || '').trim();
+  return {
+    tables: tables.length ? tables : undefined,
+    fields: fields.length ? fields : undefined,
+    rowSelector: rowSel || undefined
+  };
 }
 
 document.getElementById('btnSave').addEventListener('click', async () => {
   const connection_id = document.getElementById('connection_id').value;
   if (!connection_id) { document.getElementById('error').textContent = 'Selectează o conexiune.'; document.getElementById('error').style.display = 'block'; return; }
   document.getElementById('error').style.display = 'none';
-  const config = Object.keys(selectedTableConfig).length ? buildExtractionConfig() : extractionConfig;
+  const hasTables = Object.keys(selectedTableConfig).length > 0;
+  const hasFields = customFields.some(f => (f.selector || '').trim() && (f.variable || '').trim());
+  const config = (hasTables || hasFields) ? buildExtractionConfig() : extractionConfig;
   const body = {
     name: document.getElementById('name').value,
     connection_id: parseInt(connection_id, 10),
@@ -262,6 +325,7 @@ if (jobId) {
   await loadOptions();
   renderSchedulePicker();
   await loadJob();
+  if (customFields.length === 0) renderCustomFields();
 })();
 </script>
 {% endblock %}
