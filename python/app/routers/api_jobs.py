@@ -19,6 +19,7 @@ class JobCreate(BaseModel):
     insert_script: str | None = None
     before_insert_script: str | None = None
     use_before_insert: bool = True
+    use_proxy: bool = False
     email_on_success: bool = True
     email_on_error: bool = True
     success_recipients: str | None = None
@@ -36,6 +37,7 @@ class JobUpdate(BaseModel):
     insert_script: str | None = None
     before_insert_script: str | None = None
     use_before_insert: bool | None = None
+    use_proxy: bool | None = None
     email_on_success: bool | None = None
     email_on_error: bool | None = None
     success_recipients: str | None = None
@@ -73,14 +75,25 @@ def create_job(body: JobCreate):
         ext = json.dumps(body.extraction_config) if body.extraction_config else None
         cur = db.execute("""
             INSERT INTO jobs (name, connection_id, email_config_id, url, cron_expression,
-                extraction_config, insert_script, before_insert_script, use_before_insert,
+                extraction_config, insert_script, before_insert_script, use_before_insert, use_proxy,
                 email_on_success, email_on_error, success_recipients, error_recipients, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            body.name, body.connection_id, body.email_config_id, body.url, body.cron_expression,
-            ext, body.insert_script, body.before_insert_script, 1 if body.use_before_insert else 0,
-            1 if body.email_on_success else 0, 1 if body.email_on_error else 0,
-            body.success_recipients, body.error_recipients, 1 if body.active else 0,
+            body.name,
+            body.connection_id,
+            body.email_config_id,
+            body.url,
+            body.cron_expression,
+            ext,
+            body.insert_script,
+            body.before_insert_script,
+            1 if body.use_before_insert else 0,
+            1 if body.use_proxy else 0,
+            1 if body.email_on_success else 0,
+            1 if body.email_on_error else 0,
+            body.success_recipients,
+            body.error_recipients,
+            1 if body.active else 0,
         ))
         db.commit()
         return {"id": cur.lastrowid}
@@ -139,6 +152,7 @@ def update_job(id: int, body: JobUpdate):
         insert_script = body.insert_script if body.insert_script is not None else existing["insert_script"]
         before_insert_script = body.before_insert_script if body.before_insert_script is not None else existing["before_insert_script"]
         use_before_insert = body.use_before_insert if body.use_before_insert is not None else (existing.get("use_before_insert", 1) != 0)
+        use_proxy = body.use_proxy if body.use_proxy is not None else (existing.get("use_proxy", 0) != 0)
         email_on_success = body.email_on_success if body.email_on_success is not None else (existing.get("email_on_success", 1) != 0)
         email_on_error = body.email_on_error if body.email_on_error is not None else (existing.get("email_on_error", 1) != 0)
         success_recipients = body.success_recipients if body.success_recipients is not None else existing["success_recipients"]
@@ -147,14 +161,26 @@ def update_job(id: int, body: JobUpdate):
 
         db.execute("""
             UPDATE jobs SET name=?, connection_id=?, email_config_id=?, url=?, cron_expression=?,
-                extraction_config=?, insert_script=?, before_insert_script=?, use_before_insert=?,
+                extraction_config=?, insert_script=?, before_insert_script=?, use_before_insert=?, use_proxy=?,
                 email_on_success=?, email_on_error=?, success_recipients=?, error_recipients=?, active=?,
                 updated_at=CURRENT_TIMESTAMP WHERE id=?
         """, (
-            name, connection_id, email_config_id, url, cron_expression,
-            extraction_config, insert_script, before_insert_script, 1 if use_before_insert else 0,
-            1 if email_on_success else 0, 1 if email_on_error else 0,
-            success_recipients, error_recipients, 1 if active else 0, id,
+            name,
+            connection_id,
+            email_config_id,
+            url,
+            cron_expression,
+            extraction_config,
+            insert_script,
+            before_insert_script,
+            1 if use_before_insert else 0,
+            1 if use_proxy else 0,
+            1 if email_on_success else 0,
+            1 if email_on_error else 0,
+            success_recipients,
+            error_recipients,
+            1 if active else 0,
+            id,
         ))
         db.commit()
         return {"ok": True}

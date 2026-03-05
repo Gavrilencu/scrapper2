@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     insert_script TEXT,
     before_insert_script TEXT,
     use_before_insert INTEGER DEFAULT 1,
+    use_proxy INTEGER DEFAULT 0,
     email_on_success INTEGER DEFAULT 1,
     email_on_error INTEGER DEFAULT 1,
     success_recipients TEXT,
@@ -81,12 +82,14 @@ def init_db() -> None:
     with _get_connection() as conn:
         conn.executescript(SCHEMA)
         conn.execute("PRAGMA journal_mode = WAL")
-        # Migration: use_before_insert if missing
+        # Migration: extra coloane în jobs, dacă lipsesc
         try:
             cur = conn.execute("PRAGMA table_info(jobs)")
             cols = [row[1] for row in cur.fetchall()]
             if "use_before_insert" not in cols:
                 conn.execute("ALTER TABLE jobs ADD COLUMN use_before_insert INTEGER DEFAULT 1")
+            if "use_proxy" not in cols:
+                conn.execute("ALTER TABLE jobs ADD COLUMN use_proxy INTEGER DEFAULT 0")
         except Exception:
             pass
         # Default: motor scraping = playwright

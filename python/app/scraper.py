@@ -18,7 +18,11 @@ def analyze_page(url: str) -> list[dict]:
     return scraper_playwright.analyze_page(url)
 
 
-def extract_with_config(url: str, config: dict) -> list[dict[str, Any]]:
+def extract_with_config(
+    url: str,
+    config: dict,
+    proxy: dict | None = None,
+) -> list[dict[str, Any]]:
     if _engine() == "beautifulsoup":
-        return scraper_bs4.extract_with_config(url, config)
-    return scraper_playwright.extract_with_config(url, config)
+        return scraper_bs4.extract_with_config(url, config, proxy)
+    return scraper_playwright.extract_with_config(url, config, proxy)

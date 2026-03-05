@@ -9,14 +9,38 @@ import requests
 from bs4 import BeautifulSoup
 
 
-def _get_soup(url: str) -> BeautifulSoup:
-    resp = requests.get(url, timeout=30, headers={"User-Agent": "ScrapperPro/1.0"})
+def _apply_proxy_to_server(server: str, username: str | None, password: str | None) -> str:
+    if not username or not password:
+        return server
+    # server e de forma scheme://host:port
+    if "://" in server:
+        scheme, rest = server.split("://", 1)
+    else:
+        scheme, rest = "http", server
+    return f"{scheme}://{username}:{password}@{rest}"
+
+
+def _get_soup(url: str, proxy: dict | None = None) -> BeautifulSoup:
+    headers = {"User-Agent": "ScrapperPro/1.0"}
+    kwargs: dict[str, Any] = {"timeout": 30, "headers": headers}
+    if proxy and proxy.get("server"):
+        server = proxy["server"]
+        server_with_auth = _apply_proxy_to_server(
+            server,
+            proxy.get("username"),
+            proxy.get("password"),
+        )
+        kwargs["proxies"] = {
+            "http": server_with_auth,
+            "https": server_with_auth,
+        }
+    resp = requests.get(url, **kwargs)
     resp.raise_for_status()
     return BeautifulSoup(resp.text, "html.parser")
 
 
-def analyze_page(url: str) -> list[dict]:
-    soup = _get_soup(url)
+def analyze_page(url: str, proxy: dict | None = None) -> list[dict]:
+    soup = _get_soup(url, proxy)
     results = []
     tables = soup.find_all("table")
     for i, el in enumerate(tables):
@@ -64,13 +88,17 @@ def _css_selector_only(selector: str) -> str:
     return (selector or "").strip()
 
 
-def extract_with_config(url: str, config: dict) -> list[dict[str, Any]]:
+def extract_with_config(
+    url: str,
+    config: dict,
+    proxy: dict | None = None,
+) -> list[dict[str, Any]]:
     tables_cfg = config.get("tables") or []
     fields_cfg = config.get("fields") or []
     row_selector = (config.get("rowSelector") or "").strip()
 
     all_rows: list[dict[str, Any]] = []
-    soup = _get_soup(url)
+    soup = _get_soup(url, proxy)
 
     if fields_cfg:
         row_selector_css = _css_selector_only(row_selector)

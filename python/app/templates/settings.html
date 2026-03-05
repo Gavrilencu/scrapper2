@@ -18,6 +18,27 @@
       <span class="text-muted">Beautiful Soup (HTML static, CSS)</span>
     </label>
   </div>
+  <hr style="border-color:#334155;border-width:1px;margin:0.75rem 0;" />
+  <h3 class="text-white" style="font-size:0.95rem;font-weight:600;">Proxy global (opțional)</h3>
+  <p class="text-muted" style="font-size:0.8rem;">Dacă este setat, job-urile care au bifat „Folosește proxy global” vor face request-urile de scraping prin acest proxy.</p>
+  <div class="grid-2 gap-4">
+    <div>
+      <label class="label">Host proxy</label>
+      <input id="proxy_host" class="input" placeholder="proxy.firma.ro">
+    </div>
+    <div>
+      <label class="label">Port</label>
+      <input id="proxy_port" class="input" type="number" placeholder="8080">
+    </div>
+    <div>
+      <label class="label">Utilizator (opțional)</label>
+      <input id="proxy_username" class="input" placeholder="user">
+    </div>
+    <div>
+      <label class="label">Parolă (opțional)</label>
+      <input id="proxy_password" class="input" type="password" placeholder="••••••">
+    </div>
+  </div>
   <div id="scraperMessage" style="display:none;" class="p-3 rounded-lg text-sm"></div>
   <button type="button" id="btnSaveScraper" class="btn btn-primary">Salvează motor scraping</button>
 </div>
@@ -58,12 +79,28 @@
   const s = await fetch('/api/settings').then(r => r.json());
   const engine = s.scraper_engine || 'playwright';
   document.querySelector(`input[name="scraper_engine"][value="${engine}"]`).checked = true;
+  if (s.proxy_host !== undefined) document.getElementById('proxy_host').value = s.proxy_host || '';
+  if (s.proxy_port !== undefined) document.getElementById('proxy_port').value = s.proxy_port || '';
+  if (s.proxy_username !== undefined) document.getElementById('proxy_username').value = s.proxy_username || '';
+  if (s.proxy_password !== undefined) document.getElementById('proxy_password').value = s.proxy_password || '';
 })();
 document.getElementById('btnSaveScraper').addEventListener('click', async () => {
   const val = document.querySelector('input[name="scraper_engine"]:checked')?.value || 'playwright';
   const msg = document.getElementById('scraperMessage');
   msg.style.display = 'none';
-  const r = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scraper_engine: val }), credentials: 'include' });
+  const body = {
+    scraper_engine: val,
+    proxy_host: document.getElementById('proxy_host').value || null,
+    proxy_port: document.getElementById('proxy_port').value ? parseInt(document.getElementById('proxy_port').value, 10) : null,
+    proxy_username: document.getElementById('proxy_username').value || null,
+    proxy_password: document.getElementById('proxy_password').value || null,
+  };
+  const r = await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    credentials: 'include'
+  });
   const data = await r.json().catch(() => ({}));
   msg.style.display = 'block';
   msg.className = r.ok ? 'p-3 rounded-lg text-sm success-box' : 'p-3 rounded-lg text-sm error-box';

@@ -1,7 +1,7 @@
 import re
 import json
 from datetime import datetime
-from app.database import get_db
+from app.database import get_db, get_setting
 from app.oracle_client import build_connect_string, run_script
 from app.scraper import extract_with_config
 from app.email_sender import (
@@ -36,6 +36,22 @@ def substitute_in_script(script: str, row: dict) -> str:
     return out
 
 
+def get_proxy_config() -> dict | None:
+    """Construiește configurația de proxy globală din app_settings (sau None dacă nu este setată)."""
+    host = (get_setting("proxy_host", "") or "").strip()
+    port = (get_setting("proxy_port", "") or "").strip()
+    username = (get_setting("proxy_username", "") or "").strip()
+    password = (get_setting("proxy_password", "") or "").strip()
+    if not host or not port:
+        return None
+    server = f"http://{host}:{port}"
+    return {
+        "server": server,
+        "username": username or None,
+        "password": password or None,
+    }
+
+
 def run_job(job_id: int) -> dict:
     conn = get_db()
     try:
@@ -43,7 +59,7 @@ def run_job(job_id: int) -> dict:
         if not job:
             return {"success": False, "rowsInserted": 0, "error": "Job not found"}
 
-        job = dict(job)
+            job = dict(job)
         db_conn = conn.execute(
             "SELECT * FROM connections WHERE id = ?", (job["connection_id"],)
         ).fetchone()
@@ -62,7 +78,7 @@ def run_job(job_id: int) -> dict:
             if job.get("extraction_config"):
                 extraction_config = json.loads(job["extraction_config"])
             rows = (
-                extract_with_config(job["url"], extraction_config)
+                extract_with_config(job["url"], extraction_config, proxy_cfg)
                 if extraction_config
                 else []
             )
@@ -78,6 +94,9 @@ def run_job(job_id: int) -> dict:
             before_script = (job.get("before_insert_script") or "").strip()
             insert_script = (job.get("insert_script") or "").strip()
             use_verification = job.get("use_before_insert", 1) != 0
+            use_proxy = job.get("use_proxy", 0) != 0
+
+            proxy_cfg = get_proxy_config() if use_proxy else None
 
             for row_data in rows:
                 row_dict = dict(row_data) if hasattr(row_data, "keys") else row_data

@@ -36,6 +36,13 @@
         <span class="text-muted">Job activ</span>
       </label>
     </div>
+    <div>
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+        <input type="checkbox" id="use_proxy">
+        <span class="text-muted">Folosește proxy global</span>
+      </label>
+      <p class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;">Proxy-ul global se configurează în pagina Setări.</p>
+    </div>
   </div>
 </div>
 
@@ -196,6 +203,7 @@ async function loadJob() {
   document.getElementById('success_recipients').value = j.success_recipients || '';
   document.getElementById('error_recipients').value = j.error_recipients || '';
   document.getElementById('active').checked = !!j.active;
+   document.getElementById('use_proxy').checked = !!j.use_proxy;
   if (j.extraction_config) {
     extractionConfig = typeof j.extraction_config === 'string' ? JSON.parse(j.extraction_config) : j.extraction_config;
     customFields = (extractionConfig.fields || []).map(f => ({ selector: f.selector || '', variable: f.variable || '' }));
@@ -293,6 +301,7 @@ document.getElementById('btnSave').addEventListener('click', async () => {
     insert_script: document.getElementById('insert_script').value || null,
     before_insert_script: document.getElementById('before_insert_script').value || null,
     use_before_insert: document.getElementById('use_before_insert').checked,
+    use_proxy: document.getElementById('use_proxy').checked,
     email_on_success: document.getElementById('email_on_success').checked,
     email_on_error: document.getElementById('email_on_error').checked,
     success_recipients: document.getElementById('success_recipients').value || null,

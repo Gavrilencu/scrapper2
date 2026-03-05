@@ -3,9 +3,12 @@ from typing import Any
 from playwright.sync_api import sync_playwright
 
 
-def analyze_page(url: str) -> list[dict]:
+def analyze_page(url: str, proxy: dict | None = None) -> list[dict]:
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            proxy=proxy or None,
+        )
         try:
             page = browser.new_page()
             page.goto(url, wait_until="networkidle", timeout=30000)
@@ -56,7 +59,11 @@ def _is_xpath(selector: str) -> bool:
     return s.startswith("/") or s.startswith("(.") or s.startswith("xpath=")
 
 
-def extract_with_config(url: str, config: dict) -> list[dict[str, Any]]:
+def extract_with_config(
+    url: str,
+    config: dict,
+    proxy: dict | None = None,
+) -> list[dict[str, Any]]:
     tables_cfg = config.get("tables") or []
     fields_cfg = config.get("fields") or []
     row_selector = (config.get("rowSelector") or "").strip()
@@ -64,7 +71,10 @@ def extract_with_config(url: str, config: dict) -> list[dict[str, Any]]:
     all_rows: list[dict[str, Any]] = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            proxy=proxy or None,
+        )
         try:
             page = browser.new_page()
             page.goto(url, wait_until="networkidle", timeout=30000)
