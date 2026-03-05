@@ -143,8 +143,8 @@ def test_extract_bs4(url: str, selector: str, proxy: dict | None = None) -> list
 
 
 def test_extract_lxml(url: str, selector: str, proxy: dict | None = None) -> list[str]:
-    """Extrage texte cu motorul de scraping: httpx + etree.HTML (XPath) sau CSS (lxml)."""
-    from app.scraper_engine import fetch_html, extract_by_xpath
+    """Extrage texte: XPath (sau toate celulele din tabel dacă XPath e către o celulă și nu găsește nimic) sau CSS."""
+    from app.scraper_engine import fetch_html, extract_by_xpath_or_table
     from app.scraper_lxml import _xpath_fallbacks_for_table
     from lxml import etree, cssselect
 
@@ -154,8 +154,8 @@ def test_extract_lxml(url: str, selector: str, proxy: dict | None = None) -> lis
 
     html_content = fetch_html(url, proxy=proxy, timeout=30.0)
     if _is_xpath(selector):
-        fallbacks = _xpath_fallbacks_for_table(selector)[1:]  # fără prima (originalul)
-        return extract_by_xpath(html_content, selector, xpath_fallbacks=fallbacks or None)
+        fallbacks = _xpath_fallbacks_for_table(selector)[1:]
+        return extract_by_xpath_or_table(html_content, selector, xpath_fallbacks=fallbacks or None)
     try:
         doc = etree.HTML(html_content)
         if doc is None:

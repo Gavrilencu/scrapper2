@@ -2,6 +2,7 @@
 Motor de scraping: XPath (lxml etree), tabele (BeautifulSoup + lxml), fetch (httpx), proxy.
 Folosit de scraper_lxml și de pagina de testare.
 """
+import re
 from typing import Any
 
 import httpx
@@ -34,11 +35,11 @@ def fetch_html(
 ) -> str:
     """Descarcă HTML de la URL, cu proxy opțional (dict: server, username?, password?)."""
     proxy_str = _proxy_to_httpx(proxy)
-    proxies = None
+    kwargs = {"timeout": timeout, "follow_redirects": True}
     if proxy_str and proxy_str.strip():
-        proxies = {"http://": proxy_str.strip(), "https://": proxy_str.strip()}
+        kwargs["proxy"] = proxy_str.strip()
     headers = {"User-Agent": "ScrapperPro/1.0 (httpx)"}
-    with httpx.Client(proxies=proxies, timeout=timeout, follow_redirects=True) as client:
+    with httpx.Client(**kwargs) as client:
         r = client.get(url, headers=headers)
         r.raise_for_status()
         return r.text
@@ -74,6 +75,105 @@ def extract_by_xpath(
         else:
             result.append(str(n).strip())
     return result
+
+
+def _cell_xpath_to_table_xpath(cell_xpath: str) -> str | None:
+    """Din XPath către o celulă (ex. .../table[2]/tbody/tr[1]/td[1]) obține XPath către tabel."""
+    if not cell_xpath or "table" not in cell_xpath.lower():
+        return None
+    x = cell_xpath.strip()
+    x = re.sub(r"/tbody/tr\[\d+\]/td\[\d+\]$", "", x, flags=re.IGNORECASE)
+    x = re.sub(r"/tr\[\d+\]/td\[\d+\]$", "", x, flags=re.IGNORECASE)
+    x = re.sub(r"/td\[\d+\]$", "", x, flags=re.IGNORECASE)
+    x = re.sub(r"/tbody$", "", x, flags=re.IGNORECASE)
+    x = re.sub(r"/tr\[\d+\]$", "", x, flags=re.IGNORECASE)
+    if "table" in x:
+        return x
+    return None
+
+
+def _table_xpath_fallbacks(table_xpath: str) -> list[str]:
+    """Variante de XPath pentru tabel (fără tbody, table ca descendent)."""
+    out = []
+    if "/tbody" in table_xpath:
+        s = table_xpath.replace("/tbody/", "/").rstrip("/")
+        if s.endswith("/tbody"):
+            s = s[:-6]
+        if s and s not in out:
+            out.append(s)
+    if "]/table[" in (table_xpath or ""):
+        s = table_xpath.replace("]/table[", "]//table[", 1)
+        if s not in out:
+            out.append(s)
+    return out
+
+
+def extract_table_cells_by_xpath(
+    html_content: str,
+    table_xpath: str,
+    xpath_fallbacks: list[str] | None = None,
+) -> list[str]:
+    """
+    Extrage toate celulele dintr-un tabel găsit prin XPath.
+    Returnează listă de stringuri (text din fiecare celulă, rând cu rând).
+    """
+    doc = etree.HTML(html_content)
+    if doc is None:
+        return []
+    tries = [table_xpath] + (list(xpath_fallbacks) if xpath_fallbacks else [])
+    table_el = None
+    for xp in tries:
+        if not (xp or "").strip():
+            continue
+        try:
+            nodes = doc.xpath(xp)
+            for n in nodes:
+                if n is None or not hasattr(n, "tag"):
+                    continue
+                tag = (getattr(n, "tag", None) or "")
+                if isinstance(tag, bytes):
+                    tag = tag.decode("utf-8", errors="replace")
+                if "table" in str(tag).lower():
+                    table_el = n
+                    break
+            if table_el is not None:
+                break
+        except Exception:
+            continue
+    if table_el is None:
+        return []
+    cells = []
+    for tr in table_el.xpath(".//tr"):
+        for cell in tr.xpath(".//td | .//th"):
+            if hasattr(cell, "itertext"):
+                cells.append(("".join(cell.itertext())).strip())
+            else:
+                cells.append(str(cell).strip())
+    return cells
+
+
+def extract_by_xpath_or_table(
+    html_content: str,
+    xpath: str,
+    xpath_fallbacks: list[str] | None = None,
+) -> list[str]:
+    """
+    Extrage după XPath; dacă nu găsește nimic și XPath-ul arată că e din tabel,
+    încearcă să extragă toate celulele din acel tabel (metodă „din tabel”).
+    """
+    values = extract_by_xpath(html_content, xpath, xpath_fallbacks=xpath_fallbacks)
+    if values:
+        return values
+    table_xpath = _cell_xpath_to_table_xpath(xpath)
+    if not table_xpath:
+        return []
+    table_fallbacks = _table_xpath_fallbacks(table_xpath)
+    if xpath_fallbacks:
+        for f in xpath_fallbacks:
+            t = _cell_xpath_to_table_xpath(f)
+            if t and t not in table_fallbacks:
+                table_fallbacks.append(t)
+    return extract_table_cells_by_xpath(html_content, table_xpath, xpath_fallbacks=table_fallbacks)
 
 
 def extract_table(
