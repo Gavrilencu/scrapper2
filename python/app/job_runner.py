@@ -99,25 +99,69 @@ def run_job(job_id: int) -> dict:
 
             for row_data in rows:
                 row_dict = dict(row_data) if hasattr(row_data, "keys") else row_data
-                should_insert = True
-                if use_verification and before_script:
-                    check_script = substitute_in_script(before_script, row_dict)
-                    result = run_script(
-                        oracle_user, oracle_pass, connect_string, check_script, {}
+                current_sql: str | None = None
+                try:
+                    should_insert = True
+                    if use_verification and before_script:
+                        check_script = substitute_in_script(before_script, row_dict)
+                        current_sql = check_script
+                        result = run_script(
+                            oracle_user, oracle_pass, connect_string, check_script, {}
+                        )
+                        rows_result = result.get("rows") or []
+                        if rows_result:
+                            first_row = rows_result[0]
+                            if isinstance(first_row, dict):
+                                first_val = next(iter(first_row.values()), 0)
+                            else:
+                                first_val = first_row[0] if first_row else 0
+                            if (first_val is not None and int(first_val) > 0):
+                                should_insert = False
+                    if should_insert and insert_script:
+                        script = substitute_in_script(insert_script, row_dict)
+                        current_sql = script
+                        run_script(oracle_user, oracle_pass, connect_string, script, {})
+                        rows_inserted += 1
+                except Exception as e:
+                    # Eroare la acest rând – logăm și includem valorile variabilelor + ultimul SQL
+                    row_json = json.dumps(row_dict, ensure_ascii=False)
+                    base_msg = str(e)
+                    if current_sql:
+                        error_message = f"{base_msg} | ROW={row_json} | SQL={current_sql}"
+                    else:
+                        error_message = f"{base_msg} | ROW={row_json}"
+                    conn.execute(
+                        "UPDATE job_runs SET finished_at = CURRENT_TIMESTAMP, status = ?, error_message = ? WHERE id = ?",
+                        ("error", error_message, run_id),
                     )
-                    rows_result = result.get("rows") or []
-                    if rows_result:
-                        first_row = rows_result[0]
-                        if isinstance(first_row, dict):
-                            first_val = next(iter(first_row.values()), 0)
-                        else:
-                            first_val = first_row[0] if first_row else 0
-                        if (first_val is not None and int(first_val) > 0):
-                            should_insert = False
-                if should_insert and insert_script:
-                    script = substitute_in_script(insert_script, row_dict)
-                    run_script(oracle_user, oracle_pass, connect_string, script, {})
-                    rows_inserted += 1
+                    conn.commit()
+
+                    if job.get("email_on_error") and job.get("email_config_id") and job.get("error_recipients"):
+                        try:
+                            ec = conn.execute(
+                                "SELECT * FROM email_config WHERE id = ?",
+                                (job["email_config_id"],),
+                            ).fetchone()
+                            if ec:
+                                ec = dict(ec)
+                                to_list = [e.strip() for e in job["error_recipients"].split(",") if e.strip()]
+                                send_email(
+                                    host=ec["host"],
+                                    port=ec["port"],
+                                    secure=bool(ec.get("secure")),
+                                    user=ec["user_name"],
+                                    password=ec["password"],
+                                    from_addr=ec["from_address"],
+                                    to_list=to_list,
+                                    subject=f"[Scrapper Pro] Eroare: {job['name']}",
+                                    html=build_job_error_email(
+                                        job["name"], error_message, datetime.utcnow().isoformat()
+                                    ),
+                                )
+                        except Exception:
+                            pass
+
+                    return {"success": False, "rowsInserted": rows_inserted, "error": error_message}
 
             conn.execute(
                 "UPDATE job_runs SET finished_at = CURRENT_TIMESTAMP, status = ?, rows_inserted = ? WHERE id = ?",
