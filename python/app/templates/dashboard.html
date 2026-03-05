@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Scrapper Pro{% endblock %}
+{% block content %}
+<h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">Dashboard</h1>
+<p class="text-muted mb-8">Bine ai venit. Configurează conexiunile, job-urile și notificările.</p>
+
+<div class="grid-4 mb-8">
+  <a href="/connections" class="card" style="text-decoration:none;color:inherit;">
+    <p class="text-muted" style="font-size:0.875rem;">Conexiuni baze de date</p>
+    <p id="stat-connections" class="text-white mt-1" style="font-size:1.5rem;font-weight:700;">-</p>
+  </a>
+  <a href="/jobs" class="card" style="text-decoration:none;color:inherit;">
+    <p class="text-muted" style="font-size:0.875rem;">Job-uri</p>
+    <p id="stat-jobs" class="text-white mt-1" style="font-size:1.5rem;font-weight:700;">-</p>
+  </a>
+  <a href="/email" class="card" style="text-decoration:none;color:inherit;">
+    <p class="text-muted" style="font-size:0.875rem;">Configurări email</p>
+    <p id="stat-email" class="text-white mt-1" style="font-size:1.5rem;font-weight:700;">-</p>
+  </a>
+  <a href="/runs" class="card" style="text-decoration:none;color:inherit;">
+    <p class="text-muted" style="font-size:0.875rem;">Rulări totale</p>
+    <p id="stat-runs" class="text-white mt-1" style="font-size:1.5rem;font-weight:700;">-</p>
+  </a>
+</div>
+
+<div class="card">
+  <h2 class="text-white mb-4" style="font-size:1.125rem;font-weight:600;">Pași rapizi</h2>
+  <ol class="text-muted" style="list-style:decimal;padding-left:1.5rem;line-height:1.75;">
+    <li>Adaugă o <a href="/connections" class="link">conexiune Oracle</a>.</li>
+    <li>Opțional: configurează <a href="/email" class="link">SMTP/Exchange</a> pentru notificări.</li>
+    <li>Creează un <a href="/jobs" class="link">job</a>, asociază URL-ul și baza de date.</li>
+    <li>Rulează analiza paginii, selectează tabelele/valorile de extras și scripturile de inserare/verificare.</li>
+    <li>Setează programarea (cron) și activează job-ul.</li>
+  </ol>
+</div>
+
+<script>
+(async () => {
+  const [conn, jobs, email, runs] = await Promise.all([
+    fetch('/api/connections').then(r => r.json()).then(d => Array.isArray(d) ? d.length : 0),
+    fetch('/api/jobs').then(r => r.json()).then(d => Array.isArray(d) ? d.length : 0),
+    fetch('/api/email-config').then(r => r.json()).then(d => Array.isArray(d) ? d.length : 0),
+    fetch('/api/jobs/runs').then(r => r.json()).then(d => Array.isArray(d) ? d.length : 0),
+  ]);
+  document.getElementById('stat-connections').textContent = conn;
+  document.getElementById('stat-jobs').textContent = jobs;
+  document.getElementById('stat-email').textContent = email;
+  document.getElementById('stat-runs').textContent = runs;
+})();
+</script>
+{% endblock %}

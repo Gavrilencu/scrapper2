@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Job-uri - Scrapper Pro{% endblock %}
+{% block content %}
+<div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:2rem;">
+  <div>
+    <h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">Job-uri</h1>
+    <p class="text-muted">Planifică extragerea de date și inserarea în baza de date.</p>
+  </div>
+  <a href="/jobs/new" class="btn btn-primary">+ Job nou</a>
+</div>
+
+<div class="card">
+  <div id="content">
+    <p class="text-muted" style="text-align:center;padding:3rem;">Se încarcă...</p>
+  </div>
+</div>
+
+<script>
+(async () => {
+  const list = await fetch('/api/jobs').then(r => r.json());
+  const el = document.getElementById('content');
+  if (!list.length) {
+    el.innerHTML = '<p class="text-muted" style="text-align:center;padding:3rem;">Niciun job. Creează unul și asociază un URL și o conexiune.</p>';
+    return;
+  }
+  let html = '<div style="overflow-x:auto;"><table class="w-full"><thead><tr><th>Nume</th><th>Conexiune</th><th>URL</th><th>Programare (cron)</th><th>Status</th><th style="width:10rem;">Acțiuni</th></tr></thead><tbody>';
+  for (const j of list) {
+    const status = j.active ? '<span class="text-success">Activ</span>' : '<span class="text-muted">Oprit</span>';
+    html += `<tr>
+      <td class="text-white font-medium">${escapeHtml(j.name)}</td>
+      <td class="text-muted">${escapeHtml(j.connection_name || '-')}</td>
+      <td class="text-muted truncate max-w-xs" title="${escapeHtml(j.url)}">${escapeHtml(j.url)}</td>
+      <td class="text-muted font-mono" style="font-size:0.875rem;">${escapeHtml(j.cron_expression)}</td>
+      <td>${status}</td>
+      <td>
+        <button type="button" data-run-id="${j.id}" class="btn btn-secondary" style="padding:0.5rem;" title="Rulează acum">▶</button>
+        <a href="/jobs/${j.id}" class="btn btn-secondary" style="padding:0.5rem;">Editează</a>
+        <button type="button" data-delete-id="${j.id}" class="btn btn-secondary" style="padding:0.5rem;color:#f87171;">Șterge</button>
+      </td>
+    </tr>`;
+  }
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+
+  let running = null;
+  document.querySelectorAll('[data-run-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (running) return;
+      const id = btn.getAttribute('data-run-id');
+      running = id;
+      btn.disabled = true;
+      const r = await fetch(`/api/jobs/${id}/run`, { method: 'POST' });
+      const data = await r.json();
+      running = null;
+      btn.disabled = false;
+      alert(data.success ? `Succes. Rânduri inserate: ${data.rowsInserted}` : ('Eroare: ' + (data.error || 'necunoscută')));
+      if (data.success) location.reload();
+    });
+  });
+  document.querySelectorAll('[data-delete-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Ștergi acest job și istoricul de rulări?')) return;
+      const id = btn.getAttribute('data-delete-id');
+      await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      location.reload();
+    });
+  });
+})();
+function escapeHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+</script>
+{% endblock %}

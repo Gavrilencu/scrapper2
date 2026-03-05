@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autentificare - Scrapper Pro</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="width:100%;max-width:24rem;">
+    <h1 class="text-white mb-2" style="font-size:1.5rem;font-weight:700;">Scrapper Pro</h1>
+    <p class="text-muted mb-6" style="font-size:0.875rem;">Autentificare</p>
+    <form method="post" action="/api/auth/login" id="loginForm" class="space-y-4">
+      <div id="error" class="error-box" style="display:none;"></div>
+      <div>
+        <label class="label">Utilizator</label>
+        <input name="username" class="input" type="text" required autocomplete="username">
+      </div>
+      <div>
+        <label class="label">Parolă</label>
+        <input name="password" class="input" type="password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;" id="btn">Conectare</button>
+    </form>
+  </div>
+  <script>
+    (async () => {
+      const status = await fetch('/api/auth/status', { credentials: 'include' }).then(r => r.json());
+      if (status.needsSetup) { window.location.href = '/setup'; return; }
+      if (status.user) { window.location.href = '/'; return; }
+    })();
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const btn = document.getElementById('btn');
+      const errEl = document.getElementById('error');
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Se verifică...';
+      const fd = new FormData(form);
+      const r = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }),
+        credentials: 'include',
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) {
+        window.location.href = '/';
+        return;
+      }
+      errEl.textContent = data.detail || data.error || 'Eroare la autentificare';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Conectare';
+    });
+  </script>
+</body>
+</html>

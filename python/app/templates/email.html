@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Configurare Email - Scrapper Pro{% endblock %}
+{% block content %}
+<div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:2rem;">
+  <div>
+    <h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">Configurare Email</h1>
+    <p class="text-muted">SMTP / Exchange (Outlook) pentru notificări la succes sau eroare job.</p>
+  </div>
+  <a href="/email/new" class="btn btn-primary">+ Adaugă profil</a>
+</div>
+
+<div class="card">
+  <div id="content">
+    <p class="text-muted" style="text-align:center;padding:3rem;">Se încarcă...</p>
+  </div>
+</div>
+
+<script>
+(async () => {
+  const list = await fetch('/api/email-config').then(r => r.json());
+  const el = document.getElementById('content');
+  if (!list.length) {
+    el.innerHTML = '<p class="text-muted" style="text-align:center;padding:3rem;">Nicio configurație email. Adaugă un profil SMTP/Exchange.</p>';
+    return;
+  }
+  let html = '<div style="overflow-x:auto;"><table class="w-full"><thead><tr><th>Nume</th><th>Host / Port</th><th>From</th><th style="width:8rem;">Acțiuni</th></tr></thead><tbody>';
+  for (const e of list) {
+    html += `<tr>
+      <td class="text-white font-medium">${escapeHtml(e.name)}</td>
+      <td class="text-muted">${escapeHtml(e.host)}:${e.port}</td>
+      <td class="text-muted">${escapeHtml(e.from_address)}</td>
+      <td>
+        <a href="/email/${e.id}" class="btn btn-secondary" style="padding:0.5rem;">Editează</a>
+        <button type="button" data-delete-id="${e.id}" class="btn btn-secondary" style="padding:0.5rem;color:#f87171;">Șterge</button>
+      </td>
+    </tr>`;
+  }
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+  document.querySelectorAll('[data-delete-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Ștergi această configurație email?')) return;
+      await fetch(`/api/email-config/${btn.getAttribute('data-delete-id')}`, { method: 'DELETE' });
+      location.reload();
+    });
+  });
+})();
+function escapeHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+</script>
+{% endblock %}

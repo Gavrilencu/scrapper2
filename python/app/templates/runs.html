@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Istoric rulări - Scrapper Pro{% endblock %}
+{% block content %}
+<div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:2rem;flex-wrap:wrap;gap:1rem;">
+  <div>
+    <h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">Istoric rulări</h1>
+    <p class="text-muted">Toate execuțiile job-urilor.</p>
+  </div>
+  <div class="flex gap-2 items-center">
+    <span class="text-muted" style="font-size:0.875rem;">Job:</span>
+    <select id="jobFilter" class="input" style="width:auto;min-width:200px;">
+      <option value="">Toate</option>
+    </select>
+  </div>
+</div>
+
+<div class="card">
+  <div id="content">
+    <p class="text-muted" style="text-align:center;padding:3rem;">Se încarcă...</p>
+  </div>
+</div>
+
+<script>
+let runs = [], jobs = {};
+(async () => {
+  const [runsData, jobList] = await Promise.all([
+    fetch('/api/jobs/runs').then(r => r.json()),
+    fetch('/api/jobs').then(r => r.json()),
+  ]);
+  runs = runsData;
+  jobList.forEach(j => { jobs[j.id] = j.name; });
+  const sel = document.getElementById('jobFilter');
+  Object.entries(jobs).forEach(([id, name]) => {
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = name;
+    sel.appendChild(o);
+  });
+  function render() {
+    const filter = document.getElementById('jobFilter').value;
+    const list = filter ? runs.filter(r => String(r.job_id) === filter) : runs;
+    const el = document.getElementById('content');
+    if (!list.length) {
+      el.innerHTML = '<p class="text-muted" style="text-align:center;padding:3rem;">Nicio rulare înregistrată.</p>';
+      return;
+    }
+    const formatDate = s => s ? new Date(s).toLocaleString('ro-RO') : '-';
+    let html = '<div style="overflow-x:auto;"><table class="w-full"><thead><tr><th>Job</th><th>Început</th><th>Sfârșit</th><th>Status</th><th>Rânduri</th><th>Eroare</th></tr></thead><tbody>';
+    list.forEach(r => {
+      const status = r.status === 'success' ? '<span class="text-success">Succes</span>' : r.status === 'error' ? '<span class="text-error">Eroare</span>' : '<span class="text-amber">În curs</span>';
+      html += `<tr>
+        <td class="text-white font-medium"><a href="/jobs/${r.job_id}" class="link">${escapeHtml(jobs[r.job_id] || r.job_id)}</a></td>
+        <td class="text-muted">${formatDate(r.started_at)}</td>
+        <td class="text-muted">${formatDate(r.finished_at)}</td>
+        <td>${status}</td>
+        <td class="text-muted">${r.rows_inserted}</td>
+        <td class="text-muted truncate max-w-xs" title="${escapeHtml(r.error_message || '')}">${escapeHtml(r.error_message || '-')}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+  }
+  render();
+  document.getElementById('jobFilter').addEventListener('change', render);
+})();
+function escapeHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+</script>
+{% endblock %}

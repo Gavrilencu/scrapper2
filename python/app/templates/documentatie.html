@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Documentație - Scrapper Pro{% endblock %}
+{% block content %}
+<a href="/" class="link mb-8" style="display:inline-flex;align-items:center;gap:0.5rem;">← Înapoi</a>
+<h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">Documentație Scrapper Pro</h1>
+<p class="text-muted mb-10">Descriere, funcționare și ghid de utilizare.</p>
+
+<div class="space-y-10">
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">1. Ce este Scrapper Pro?</h2>
+    <p class="text-muted mb-3">Scrapper Pro este o aplicație care extrage date din pagini web, le verifică (opțional) față de baza de date și le inserează în baze de date Oracle. Poți defini job-uri care rulează la ore fixe (zilnic, săptămânal sau la fiecare N ore) și poți primi notificări pe email la succes sau la eroare.</p>
+    <p class="text-muted">Utilizări tipice: sincronizare prețuri/produse de pe site-uri în baza internă, colectare date din tabele HTML, monitorizare pagini cu notificări la schimbări.</p>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">2. Cum funcționează (fluxul general)</h2>
+    <ol class="text-muted" style="list-style:decimal;padding-left:1.5rem;line-height:1.75;">
+      <li>Definiți <strong class="text-white">conexiuni</strong> la baze de date Oracle (host, port, service name, user, parolă).</li>
+      <li>Opțional: configurați <strong class="text-white">email</strong> (SMTP/Exchange) pentru notificări.</li>
+      <li>Creați un <strong class="text-white">job</strong>: îi dați un URL, îi asociați o conexiune și setați cum se extrag datele (tabele detectate automat sau XPath/CSS → variabile).</li>
+      <li>În job puteți defini un <strong class="text-white">script de verificare</strong> (opțional): dacă este activat și returnează COUNT &gt; 0, rândul nu se inserează; dacă COUNT = 0 sau verificarea este dezactivată, se rulează scriptul de inserare.</li>
+      <li>Scriptul de <strong class="text-white">inserare</strong> folosește variabilele extrase cu sintaxa <code style="background:#1e293b;padding:0 0.25rem;border-radius:0.25rem;">{{'{{nume_variabilă}}'}}</code>.</li>
+      <li>Job-ul rulează conform <strong class="text-white">programării</strong> (zilnic, săptămânal, la N ore). Puteți și „Rulează acum” din listă.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">3. Prima utilizare (pași rapizi)</h2>
+    <ul class="text-muted" style="list-style:disc;padding-left:1.5rem;line-height:1.75;">
+      <li>La prima accesare veți fi redirecționat la <strong class="text-white">Configurare inițială</strong>: setați utilizatorul și parola de administrator.</li>
+      <li>După aceea, la fiecare acces veți introduce acest utilizator și parola pe pagina de <strong class="text-white">Login</strong>.</li>
+      <li>Meniul principal: <a href="/" class="link">Dashboard</a>, <a href="/connections" class="link">Conexiuni DB</a>, <a href="/jobs" class="link">Job-uri</a>, <a href="/email" class="link">Configurare Email</a>, <a href="/runs" class="link">Istoric rulări</a>, <a href="/documentatie" class="link">Documentație</a>, <a href="/settings" class="link">Setări</a>.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">4. Conexiuni baze de date</h2>
+    <p class="text-muted mb-3">Din <strong class="text-white">Conexiuni DB</strong> adăugați una sau mai multe conexiuni Oracle. Completați: nume, host, port (de obicei 1521), service name, utilizator și parolă. Puteți apăsa „Testează conexiunea” pentru a verifica înainte de salvare.</p>
+    <p class="text-muted">Fiecare job va folosi una dintre aceste conexiuni pentru a rula scripturile de verificare și inserare.</p>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">5. Job-uri – URL și extragere date</h2>
+    <p class="text-muted mb-3">Un job are: <strong class="text-white">URL</strong> (pagina de scanat), <strong class="text-white">conexiune</strong> asignată și <strong class="text-white">configurare de extragere</strong>.</p>
+    <h3 class="text-white mb-2" style="font-weight:500;margin-top:1rem;">5.1 Tabele detectate automat</h3>
+    <p class="text-muted mb-3">După ce introduceți URL-ul, apăsați <strong class="text-white">Analizează</strong>. Aplicația detectează tabele HTML pe pagină. Selectați tabelele dorite și mapați coloanele sursă la nume de variabile (target). Aceste nume le veți folosi în scripturi cu <code style="background:#1e293b;padding:0 0.25rem;border-radius:0.25rem;">{{'{{nume}}'}}</code>.</p>
+    <h3 class="text-white mb-2" style="font-weight:500;margin-top:1rem;">5.2 XPath / CSS → variabile</h3>
+    <p class="text-muted mb-3">Puteți defini manual perechi <strong class="text-white">selector → variabilă</strong>. Selectorul poate fi XPath sau CSS. Variabila este numele pe care îl folosiți în scripturi.</p>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">6. Script de verificare (opțional)</h2>
+    <p class="text-muted mb-3">Checkbox-ul <strong class="text-white">„Folosește script de verificare”</strong> activează sau dezactivează acest script.</p>
+    <ul class="text-muted mb-3" style="list-style:disc;padding-left:1.5rem;">
+      <li><strong class="text-white">Dezactivat:</strong> toate rândurile extrase sunt inserate.</li>
+      <li><strong class="text-white">Activat:</strong> dacă scriptul returnează o valoare numerică &gt; 0, rândul nu se inserează.</li>
+    </ul>
+    <p class="text-muted">Exemplu: <code class="font-mono" style="display:block;background:#1e293b;padding:0.5rem;border-radius:0.25rem;margin-top:0.5rem;font-size:0.875rem;">SELECT COUNT(*) AS cnt FROM produse WHERE cod = '{{'{{cod}}'}}'</code></p>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">7. Script de inserare</h2>
+    <p class="text-muted mb-3">Folosește variabilele extrase cu <code style="background:#1e293b;padding:0 0.25rem;border-radius:0.25rem;">{{'{{nume_variabilă}}'}}</code>. Exemplu:</p>
+    <p class="font-mono text-muted" style="font-size:0.875rem;background:#1e293b;padding:0.75rem;border-radius:0.25rem;">INSERT INTO produse (cod, denumire, pret) VALUES ('{{'{{cod}}'}}', '{{'{{denumire}}'}}', '{{'{{pret}}'}}')</p>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">8. Programare (scheduler)</h2>
+    <p class="text-muted mb-3">În job puteți seta: <strong class="text-white">Zilnic</strong>, <strong class="text-white">Săptămânal</strong>, <strong class="text-white">La N ore</strong>. Job-urile active rulează automat. Puteți și „Rulează acum” din lista de job-uri.</p>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">9. Notificări email</h2>
+    <p class="text-muted mb-3">Din <strong class="text-white">Configurare Email</strong> adăugați un profil SMTP (ex: Exchange/Outlook). În fiecare job puteți alege acest profil și trimite email la succes sau la eroare.</p>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">10. Istoric rulări</h2>
+    <p class="text-muted">În <strong class="text-white">Istoric rulări</strong> vedeți toate execuțiile job-urilor: dată, status, număr rânduri inserate și mesaj de eroare. Puteți filtra pe job.</p>
+  </section>
+
+  <section class="card">
+    <h2 class="text-white mb-3" style="font-size:1.25rem;font-weight:600;">11. Setări și utilizatori</h2>
+    <p class="text-muted mb-3">Din <strong class="text-white">Setări</strong> puteți adăuga utilizator (cont nou) și deconectare.</p>
+  </section>
+</div>
+{% endblock %}

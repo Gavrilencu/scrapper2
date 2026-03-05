@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Scrapper Pro{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>Scrapper Pro</h1>
+        <p>Extragere date & planificare</p>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
+        <a href="/connections" class="{% if request.url.path.startswith('/connections') %}active{% endif %}">Conexiuni DB</a>
+        <a href="/jobs" class="{% if request.url.path.startswith('/jobs') %}active{% endif %}">Job-uri</a>
+        <a href="/email" class="{% if request.url.path.startswith('/email') %}active{% endif %}">Configurare Email</a>
+        <a href="/runs" class="{% if request.url.path == '/runs' %}active{% endif %}">Istoric rulări</a>
+        <a href="/documentatie" class="{% if request.url.path == '/documentatie' %}active{% endif %}">Documentație</a>
+        <a href="/settings" class="{% if request.url.path == '/settings' %}active{% endif %}">Setări</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button type="button" id="logoutBtn">Deconectare</button>
+      </div>
+    </aside>
+    <main class="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script>
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      window.location.href = '/login';
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

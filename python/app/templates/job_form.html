@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}{% if job_id %}Editează job{% else %}Job nou{% endif %} - Scrapper Pro{% endblock %}
+{% block content %}
+<a href="/jobs" class="link mb-6" style="display:inline-flex;align-items:center;gap:0.5rem;">← Înapoi la job-uri</a>
+<h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">{% if job_id %}Editează job{% else %}Job nou{% endif %}</h1>
+<p class="text-muted mb-8">{% if job_id %}Modifică configurația și salvează.{% else %}Configurează URL-ul, conexiunea, extragerea și scripturile.{% endif %}</p>
+
+<div id="error" class="error-box mb-6" style="display:none;"></div>
+
+<div class="card mb-6">
+  <h2 class="text-white mb-4" style="font-size:1.125rem;font-weight:600;">Detalii job</h2>
+  <div class="grid-2 gap-4 space-y-4">
+    <div>
+      <label class="label">Nume job</label>
+      <input id="name" class="input" placeholder="ex: Scrape produse zilnic" required>
+    </div>
+    <div>
+      <label class="label">Conexiune bază de date</label>
+      <select id="connection_id" class="input" required><option value="">Selectează...</option></select>
+    </div>
+    <div style="grid-column:1/-1;">
+      <label class="label">URL de scanat</label>
+      <div class="flex gap-2">
+        <input id="url" class="input" placeholder="https://..." style="flex:1;">
+        <button type="button" id="btnAnalyze" class="btn btn-secondary">Analizează</button>
+      </div>
+    </div>
+    <div style="grid-column:1/-1;">
+      <label class="label">Programare (cron)</label>
+      <div id="schedulePicker"></div>
+      <p class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;">Cron: <span id="cronDisplay">0 9 * * *</span></p>
+    </div>
+    <div>
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+        <input type="checkbox" id="active" checked>
+        <span class="text-muted">Job activ</span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-6">
+  <h2 class="text-white mb-4" style="font-size:1.125rem;font-weight:600;">Script verificare (înainte de inserare)</h2>
+  <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:0.5rem;">
+    <input type="checkbox" id="use_before_insert" checked>
+    <span class="text-muted">Folosește script de verificare</span>
+  </label>
+  <p class="text-muted mb-2" style="font-size:0.875rem;">Când e activat: inserarea se face doar dacă scriptul returnează COUNT = 0.</p>
+  <textarea id="before_insert_script" class="input font-mono" style="min-height:100px;font-size:0.875rem;" placeholder="SELECT COUNT(*) AS cnt FROM mytable WHERE cod = '{{cod}}'"></textarea>
+</div>
+
+<div class="card mb-6">
+  <h2 class="text-white mb-4" style="font-size:1.125rem;font-weight:600;">Script inserare</h2>
+  <p class="text-muted mb-2" style="font-size:0.875rem;">Folosește {{'{{nume_coloană}}'}} pentru valorile extrase.</p>
+  <textarea id="insert_script" class="input font-mono" style="min-height:120px;font-size:0.875rem;" placeholder="INSERT INTO mytable (col1, col2) VALUES ('{{col1}}', '{{col2}}')"></textarea>
+</div>
+
+<div class="card mb-6">
+  <h2 class="text-white mb-4" style="font-size:1.125rem;font-weight:600;">Notificări email</h2>
+  <div class="mb-4">
+    <label class="label">Profil email (SMTP/Exchange)</label>
+    <select id="email_config_id" class="input"><option value="">Fără notificări</option></select>
+  </div>
+  <div class="flex gap-6 mb-4">
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" id="email_on_success" checked><span class="text-muted">Email la succes</span></label>
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" id="email_on_error" checked><span class="text-muted">Email la eroare</span></label>
+  </div>
+  <div class="grid-2 gap-4">
+    <div>
+      <label class="label">Destinatari succes (email-uri separate prin virgulă)</label>
+      <input id="success_recipients" class="input" placeholder="a@firma.ro, b@firma.ro">
+    </div>
+    <div>
+      <label class="label">Destinatari eroare</label>
+      <input id="error_recipients" class="input" placeholder="admin@firma.ro">
+    </div>
+  </div>
+</div>
+
+<div id="tablesSection" class="card mb-6" style="display:none;">
+  <h2 class="text-white mb-4" style="font-size:1.125rem;font-weight:600;">Tabele detectate – selectează și mapează coloane</h2>
+  <div id="tablesContainer"></div>
+</div>
+
+<div class="flex gap-3">
+  <button type="button" id="btnSave" class="btn btn-primary">{% if job_id %}Salvează{% else %}Creează job{% endif %}</button>
+  <a href="/jobs" class="btn btn-secondary">Anulare</a>
+  {% if job_id %}
+  <button type="button" id="btnRun" class="btn btn-primary">Rulează acum</button>
+  {% endif %}
+</div>
+
+<script>
+const jobId = {{ job_id if job_id is not none else 'null' }};
+let cronExpression = '0 9 * * *';
+let detectedTables = [];
+let selectedTableConfig = {};
+let extractionConfig = null;
+
+async function loadOptions() {
+  const [connections, emailConfigs] = await Promise.all([
+    fetch('/api/connections').then(r => r.json()),
+    fetch('/api/email-config').then(r => r.json()),
+  ]);
+  const connSel = document.getElementById('connection_id');
+  connections.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; connSel.appendChild(o); });
+  const emailSel = document.getElementById('email_config_id');
+  emailConfigs.forEach(e => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.name; emailSel.appendChild(o); });
+}
+
+function renderSchedulePicker() {
+  const presets = [
+    { label: 'Zilnic', cron: '0 9 * * *' },
+    { label: 'Săptămânal (Luni)', cron: '0 9 * * 1' },
+    { label: 'La 2 ore', cron: '0 */2 * * *' },
+    { label: 'La 6 ore', cron: '0 */6 * * *' },
+  ];
+  let html = '<div class="flex gap-2 flex-wrap">';
+  presets.forEach(p => {
+    const active = p.cron === cronExpression ? 'btn-primary' : 'btn-secondary';
+    html += `<button type="button" class="btn ${active}" data-cron="${p.cron}">${p.label}</button>`;
+  });
+  html += '</div>';
+  document.getElementById('schedulePicker').innerHTML = html;
+  document.getElementById('cronDisplay').textContent = cronExpression;
+  document.querySelectorAll('#schedulePicker [data-cron]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      cronExpression = btn.getAttribute('data-cron');
+      renderSchedulePicker();
+    });
+  });
+}
+
+async function loadJob() {
+  if (!jobId) return;
+  const j = await fetch(`/api/jobs/${jobId}`).then(r => r.json());
+  document.getElementById('name').value = j.name;
+  document.getElementById('connection_id').value = j.connection_id;
+  document.getElementById('email_config_id').value = j.email_config_id || '';
+  document.getElementById('url').value = j.url;
+  cronExpression = j.cron_expression || '0 9 * * *';
+  document.getElementById('before_insert_script').value = j.before_insert_script || '';
+  document.getElementById('insert_script').value = j.insert_script || '';
+  document.getElementById('use_before_insert').checked = j.use_before_insert !== 0;
+  document.getElementById('email_on_success').checked = !!j.email_on_success;
+  document.getElementById('email_on_error').checked = !!j.email_on_error;
+  document.getElementById('success_recipients').value = j.success_recipients || '';
+  document.getElementById('error_recipients').value = j.error_recipients || '';
+  document.getElementById('active').checked = !!j.active;
+  if (j.extraction_config) extractionConfig = typeof j.extraction_config === 'string' ? JSON.parse(j.extraction_config) : j.extraction_config;
+  renderSchedulePicker();
+}
+
+document.getElementById('btnAnalyze').addEventListener('click', async () => {
+  const url = document.getElementById('url').value.trim();
+  if (!url) { document.getElementById('error').textContent = 'Introdu URL-ul de analizat.'; document.getElementById('error').style.display = 'block'; return; }
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('btnAnalyze').disabled = true;
+  document.getElementById('btnAnalyze').textContent = 'Analizez...';
+  try {
+    const r = await fetch('/api/scrape/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || data.error || 'Eroare analiză');
+    detectedTables = data.tables || [];
+    selectedTableConfig = {};
+    const section = document.getElementById('tablesSection');
+    const container = document.getElementById('tablesContainer');
+    if (!detectedTables.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    container.innerHTML = detectedTables.map(t => {
+      const cols = (t.headers || []).map(h => `<div class="flex gap-3 mb-2"><span class="text-muted" style="width:10rem;">${h}</span><input class="input" style="max-width:20rem;" data-table="${t.id}" data-source="${h}" placeholder="Nume coloană destinație" value="${h}"></div>`).join('');
+      return `<div class="mb-4 p-4 rounded-lg" style="border:1px solid #334155;background:rgba(30,41,59,0.5);">
+        <label class="flex items-center gap-2 cursor-pointer mb-3">
+          <input type="checkbox" data-table-id="${t.id}">
+          <span class="font-medium text-white">${t.id}</span>
+          <span class="text-muted" style="font-size:0.875rem;">(${t.rows?.length || 0} rânduri)</span>
+        </label>
+        <div class="ml-6" data-cols="${t.id}" style="display:none;">${cols}</div>
+      </div>`;
+    }).join('');
+    container.querySelectorAll('[data-table-id]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const tid = cb.getAttribute('data-table-id');
+        const colDiv = container.querySelector(`[data-cols="${tid}"]`);
+        colDiv.style.display = cb.checked ? 'block' : 'none';
+        if (cb.checked) {
+          const t = detectedTables.find(x => x.id === tid);
+          if (t) selectedTableConfig[tid] = (t.headers || []).map(h => ({ source: h, target: h }));
+        } else delete selectedTableConfig[tid];
+      });
+    });
+    container.querySelectorAll('input[data-table]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const tid = inp.getAttribute('data-table'), src = inp.getAttribute('data-source');
+        if (!selectedTableConfig[tid]) selectedTableConfig[tid] = [];
+        const idx = selectedTableConfig[tid].findIndex(c => c.source === src);
+        if (idx >= 0) selectedTableConfig[tid][idx].target = inp.value;
+        else selectedTableConfig[tid].push({ source: src, target: inp.value });
+      });
+    });
+  } catch (err) {
+    document.getElementById('error').textContent = err.message;
+    document.getElementById('error').style.display = 'block';
+    detectedTables = [];
+  }
+  document.getElementById('btnAnalyze').disabled = false;
+  document.getElementById('btnAnalyze').textContent = 'Analizează';
+});
+
+function buildExtractionConfig() {
+  const tables = Object.entries(selectedTableConfig).map(([id, columns]) => {
+    const t = detectedTables.find(d => d.id === id);
+    return { id, selector: t?.selector || 'table', type: t?.type || 'html_table', columns: columns.filter(c => c.source) };
+  });
+  return { tables: tables.length ? tables : undefined, fields: undefined, rowSelector: undefined };
+}
+
+document.getElementById('btnSave').addEventListener('click', async () => {
+  const connection_id = document.getElementById('connection_id').value;
+  if (!connection_id) { document.getElementById('error').textContent = 'Selectează o conexiune.'; document.getElementById('error').style.display = 'block'; return; }
+  document.getElementById('error').style.display = 'none';
+  const config = Object.keys(selectedTableConfig).length ? buildExtractionConfig() : extractionConfig;
+  const body = {
+    name: document.getElementById('name').value,
+    connection_id: parseInt(connection_id, 10),
+    email_config_id: document.getElementById('email_config_id').value ? parseInt(document.getElementById('email_config_id').value, 10) : null,
+    url: document.getElementById('url').value,
+    cron_expression: cronExpression,
+    extraction_config: config,
+    insert_script: document.getElementById('insert_script').value || null,
+    before_insert_script: document.getElementById('before_insert_script').value || null,
+    use_before_insert: document.getElementById('use_before_insert').checked,
+    email_on_success: document.getElementById('email_on_success').checked,
+    email_on_error: document.getElementById('email_on_error').checked,
+    success_recipients: document.getElementById('success_recipients').value || null,
+    error_recipients: document.getElementById('error_recipients').value || null,
+    active: document.getElementById('active').checked,
+  };
+  document.getElementById('btnSave').disabled = true;
+  const url = jobId ? `/api/jobs/${jobId}` : '/api/jobs';
+  const method = jobId ? 'PUT' : 'POST';
+  const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  document.getElementById('btnSave').disabled = false;
+  if (!r.ok) { document.getElementById('error').textContent = data.detail || data.error || 'Eroare'; document.getElementById('error').style.display = 'block'; return; }
+  await fetch('/api/scheduler/reload', { method: 'POST' });
+  if (jobId) window.location.href = '/jobs';
+  else window.location.href = '/jobs/' + data.id;
+});
+
+if (jobId) {
+  document.getElementById('btnRun').addEventListener('click', async () => {
+    document.getElementById('btnRun').disabled = true;
+    const r = await fetch(`/api/jobs/${jobId}/run`, { method: 'POST' });
+    const data = await r.json();
+    document.getElementById('btnRun').disabled = false;
+    alert(data.success ? `Succes. Rânduri inserate: ${data.rowsInserted}` : (data.error || 'Eroare la rulare'));
+  });
+}
+
+(async () => {
+  await loadOptions();
+  renderSchedulePicker();
+  await loadJob();
+})();
+</script>
+{% endblock %}

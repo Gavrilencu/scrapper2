@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Setări - Scrapper Pro{% endblock %}
+{% block content %}
+<a href="/" class="link mb-6" style="display:inline-flex;align-items:center;gap:0.5rem;">← Înapoi</a>
+<h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">Setări</h1>
+<p class="text-muted mb-8">Gestionare utilizatori și sesiune.</p>
+
+<div class="card space-y-4 mb-8">
+  <h2 class="text-white" style="font-size:1.125rem;font-weight:600;">Adaugă utilizator</h2>
+  <p class="text-muted" style="font-size:0.875rem;">Creează un cont nou (utilizator + parolă) pentru acces la aplicație.</p>
+  <form id="addUserForm" class="space-y-4">
+    <div id="message" style="display:none;" class="p-3 rounded-lg text-sm"></div>
+    <div class="grid-2 gap-4">
+      <div>
+        <label class="label">Utilizator</label>
+        <input name="username" class="input" required>
+      </div>
+      <div>
+        <label class="label">Parolă (min. 6 caractere)</label>
+        <input name="password" class="input" type="password" required>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary" id="btnAdd">Creează utilizator</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2 class="text-white mb-2" style="font-size:1.125rem;font-weight:600;">Sesiune</h2>
+  <p class="text-muted mb-4" style="font-size:0.875rem;">Deconectează-te din aplicație.</p>
+  <button type="button" id="logoutBtn" class="btn btn-secondary">Deconectare</button>
+</div>
+<script>
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    window.location.href = '/login';
+  });
+</script>
+
+<script>
+document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const msg = document.getElementById('message');
+  msg.style.display = 'none';
+  if (form.password.value.length < 6) {
+    msg.textContent = 'Parola trebuie să aibă minim 6 caractere.';
+    msg.className = 'p-3 rounded-lg text-sm error-box';
+    msg.style.display = 'block';
+    return;
+  }
+  document.getElementById('btnAdd').disabled = true;
+  const r = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: form.username.value.trim(), password: form.password.value }),
+    credentials: 'include',
+  });
+  const data = await r.json().catch(() => ({}));
+  document.getElementById('btnAdd').disabled = false;
+  msg.style.display = 'block';
+  if (r.ok) {
+    msg.textContent = 'Utilizator creat.';
+    msg.className = 'p-3 rounded-lg text-sm success-box';
+    form.username.value = '';
+    form.password.value = '';
+  } else {
+    msg.textContent = data.detail || data.error || 'Eroare';
+    msg.className = 'p-3 rounded-lg text-sm error-box';
+  }
+});
+</script>
+{% endblock %}

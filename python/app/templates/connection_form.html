@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{% if connection_id %}Editează conexiune{% else %}Conexiune nouă{% endif %} - Scrapper Pro{% endblock %}
+{% block content %}
+<a href="/connections" class="link mb-6" style="display:inline-flex;align-items:center;gap:0.5rem;">← Înapoi la conexiuni</a>
+<h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">{% if connection_id %}Editează conexiune{% else %}Conexiune nouă (Oracle){% endif %}</h1>
+<p class="text-muted mb-8">{% if connection_id %}Lasă parola goală pentru a o păstra neschimbată.{% else %}Completează datele de conectare la baza de date.{% endif %}</p>
+
+<div class="card" style="max-width:42rem;">
+  <div id="error" class="error-box mb-4" style="display:none;"></div>
+  <form id="form" class="space-y-4">
+    <div>
+      <label class="label">Nume conexiune</label>
+      <input name="name" class="input" required>
+    </div>
+    <div class="grid-2">
+      <div>
+        <label class="label">Host</label>
+        <input name="host" class="input" placeholder="localhost sau IP" required>
+      </div>
+      <div>
+        <label class="label">Port</label>
+        <input name="port" class="input" type="number" value="1521">
+      </div>
+    </div>
+    <div>
+      <label class="label">Service name</label>
+      <input name="service_name" class="input" placeholder="ORCL" required>
+    </div>
+    <div class="grid-2">
+      <div>
+        <label class="label">Utilizator</label>
+        <input name="user_name" class="input" required>
+      </div>
+      <div>
+        <label class="label">Parolă {% if connection_id %}(gol = neschimbat){% endif %}</label>
+        <input name="password" class="input" type="password" {% if not connection_id %}required{% endif %}>
+      </div>
+    </div>
+    <div id="testResult" class="success-box" style="display:none;"></div>
+    <div class="flex gap-3 flex-wrap">
+      <button type="button" id="btnTest" class="btn btn-secondary">Testează conexiunea</button>
+      <button type="submit" class="btn btn-primary" id="btnSave">Salvează</button>
+      <a href="/connections" class="btn btn-secondary">Anulare</a>
+    </div>
+  </form>
+</div>
+
+<script>
+const connectionId = {{ connection_id if connection_id is not none else 'null' }};
+(async () => {
+  if (connectionId) {
+    const c = await fetch(`/api/connections/${connectionId}`).then(r => r.json());
+    document.querySelector('[name=name]').value = c.name;
+    document.querySelector('[name=host]').value = c.host;
+    document.querySelector('[name=port]').value = c.port || 1521;
+    document.querySelector('[name=service_name]').value = c.service_name || '';
+    document.querySelector('[name=user_name]').value = c.user_name;
+  }
+})();
+
+document.getElementById('btnTest').addEventListener('click', async () => {
+  const form = document.getElementById('form');
+  const host = form.host.value, port = parseInt(form.port.value, 10) || 1521, service_name = form.service_name.value, user_name = form.user_name.value, password = form.password.value;
+  if (!host || !service_name || !user_name || !password) {
+    document.getElementById('testResult').textContent = 'Completează host, service name, user și parolă.';
+    document.getElementById('testResult').className = 'error-box';
+    document.getElementById('testResult').style.display = 'block';
+    return;
+  }
+  document.getElementById('btnTest').disabled = true;
+  const r = await fetch('/api/connections/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host, port, service_name, user_name, password }) });
+  const data = await r.json();
+  document.getElementById('btnTest').disabled = false;
+  const resEl = document.getElementById('testResult');
+  resEl.textContent = data.success ? 'Conexiune reușită.' : (data.error || 'Eroare');
+  resEl.className = data.success ? 'success-box' : 'error-box';
+  resEl.style.display = 'block';
+});
+
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const body = { name: form.name.value, type: 'oracle', host: form.host.value, port: parseInt(form.port.value, 10) || 1521, service_name: form.service_name.value, user_name: form.user_name.value };
+  if (form.password.value) body.password = form.password.value;
+  const url = connectionId ? `/api/connections/${connectionId}` : '/api/connections';
+  const method = connectionId ? 'PUT' : 'POST';
+  document.getElementById('btnSave').disabled = true;
+  const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  document.getElementById('btnSave').disabled = false;
+  if (!r.ok) {
+    document.getElementById('error').textContent = data.detail || data.error || 'Eroare';
+    document.getElementById('error').style.display = 'block';
+    return;
+  }
+  window.location.href = '/connections';
+});
+</script>
+{% endblock %}

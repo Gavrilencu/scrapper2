@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{% if config_id %}Editează profil email{% else %}Profil email nou{% endif %} - Scrapper Pro{% endblock %}
+{% block content %}
+<a href="/email" class="link mb-6" style="display:inline-flex;align-items:center;gap:0.5rem;">← Înapoi</a>
+<h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">{% if config_id %}Editează profil email{% else %}Profil email nou{% endif %}</h1>
+<p class="text-muted mb-8">{% if config_id %}Lasă parola goală pentru a o păstra.{% else %}SMTP sau Exchange (Outlook).{% endif %}</p>
+
+<div class="card" style="max-width:42rem;">
+  <div id="error" class="error-box mb-4" style="display:none;"></div>
+  <form id="form" class="space-y-4">
+    <div>
+      <label class="label">Nume profil</label>
+      <input name="name" class="input" placeholder="ex: Exchange Firma" required>
+    </div>
+    <div class="grid-2">
+      <div>
+        <label class="label">Host SMTP</label>
+        <input name="host" class="input" placeholder="smtp.office365.com" required>
+      </div>
+      <div>
+        <label class="label">Port</label>
+        <input name="port" class="input" type="number" value="587">
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+      <input type="checkbox" name="secure">
+      <span class="text-muted">SSL/TLS (port 465)</span>
+    </label>
+    <div class="grid-2">
+      <div>
+        <label class="label">Utilizator</label>
+        <input name="user_name" class="input" required>
+      </div>
+      <div>
+        <label class="label">Parolă {% if config_id %}(gol = neschimbat){% endif %}</label>
+        <input name="password" class="input" type="password" {% if not config_id %}required{% endif %}>
+      </div>
+    </div>
+    <div>
+      <label class="label">Adresă From</label>
+      <input name="from_address" class="input" type="email" placeholder="noreply@firma.ro" required>
+    </div>
+    <div class="flex gap-3">
+      <button type="submit" class="btn btn-primary" id="btnSave">Salvează</button>
+      <a href="/email" class="btn btn-secondary">Anulare</a>
+    </div>
+  </form>
+</div>
+
+<script>
+const configId = {{ config_id if config_id is not none else 'null' }};
+(async () => {
+  if (configId) {
+    const c = await fetch(`/api/email-config/${configId}`).then(r => r.json());
+    document.querySelector('[name=name]').value = c.name;
+    document.querySelector('[name=host]').value = c.host;
+    document.querySelector('[name=port]').value = c.port || 587;
+    document.querySelector('[name=secure]').checked = !!c.secure;
+    document.querySelector('[name=user_name]').value = c.user_name;
+    document.querySelector('[name=from_address]').value = c.from_address;
+  }
+})();
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const body = { name: form.name.value, host: form.host.value, port: parseInt(form.port.value, 10) || 587, secure: form.secure.checked, user_name: form.user_name.value, from_address: form.from_address.value };
+  if (form.password.value) body.password = form.password.value;
+  const url = configId ? `/api/email-config/${configId}` : '/api/email-config';
+  const method = configId ? 'PUT' : 'POST';
+  document.getElementById('btnSave').disabled = true;
+  const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  document.getElementById('btnSave').disabled = false;
+  if (!r.ok) {
+    document.getElementById('error').textContent = data.detail || data.error || 'Eroare';
+    document.getElementById('error').style.display = 'block';
+    return;
+  }
+  window.location.href = '/email';
+});
+</script>
+{% endblock %}
