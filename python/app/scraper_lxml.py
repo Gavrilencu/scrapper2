@@ -38,13 +38,30 @@ def _get_tree(url: str, proxy: dict | None = None):
     return html.fromstring(resp.content)
 
 
+def _xpath_without_tbody(xpath: str) -> str:
+    """Transformă XPath copiat din browser (cu tbody) în variantă validă pentru lxml (fără tbody implicit).
+    În browser există table > tbody > tr; lxml poate avea table > tr. Eliminăm doar nivelul /tbody/ din cale."""
+    if not xpath or "/tbody" not in xpath:
+        return xpath
+    # /tbody/ -> /  (table/tbody/tr -> table/tr); /tbody la final -> eliminat
+    s = xpath.replace("/tbody/", "/")
+    if s.endswith("/tbody"):
+        s = s[:-6]
+    return s
+
+
 def _nodes_for_selector(root, selector: str):
-    """Returnează listă de noduri pentru selector (XPath sau CSS)."""
+    """Returnează listă de noduri pentru selector (XPath sau CSS). Pentru XPath, dacă nu găsește nimic și path-ul conține tbody, încearcă fără tbody (compatibil cu Copy XPath din Chrome)."""
     sel = (selector or "").strip()
     if not sel:
         return []
     if _is_xpath(selector):
-        return root.xpath(selector)
+        nodes = root.xpath(sel)
+        if not nodes and "/tbody" in sel:
+            fallback = _xpath_without_tbody(sel)
+            if fallback != sel:
+                nodes = root.xpath(fallback)
+        return nodes
     try:
         return list(cssselect.CSSSelector(sel)(root))
     except Exception:
