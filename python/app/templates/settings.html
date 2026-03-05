@@ -3,7 +3,24 @@
 {% block content %}
 <a href="/" class="link mb-6" style="display:inline-flex;align-items:center;gap:0.5rem;">← Înapoi</a>
 <h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">Setări</h1>
-<p class="text-muted mb-8">Gestionare utilizatori și sesiune.</p>
+<p class="text-muted mb-8">Gestionare utilizatori, motor scraping și sesiune.</p>
+
+<div class="card space-y-4 mb-8">
+  <h2 class="text-white" style="font-size:1.125rem;font-weight:600;">Motor scraping</h2>
+  <p class="text-muted" style="font-size:0.875rem;">Alege cum se extrag datele de pe pagini web: <strong class="text-white">Playwright</strong> (rulează JavaScript, suportă XPath) sau <strong class="text-white">Beautiful Soup</strong> (doar HTML static, doar selectoare CSS, mai rapid).</p>
+  <div class="flex gap-4 items-center flex-wrap">
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+      <input type="radio" name="scraper_engine" value="playwright">
+      <span class="text-muted">Playwright (JavaScript + XPath)</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+      <input type="radio" name="scraper_engine" value="beautifulsoup">
+      <span class="text-muted">Beautiful Soup (HTML static, CSS)</span>
+    </label>
+  </div>
+  <div id="scraperMessage" style="display:none;" class="p-3 rounded-lg text-sm"></div>
+  <button type="button" id="btnSaveScraper" class="btn btn-primary">Salvează motor scraping</button>
+</div>
 
 <div class="card space-y-4 mb-8">
   <h2 class="text-white" style="font-size:1.125rem;font-weight:600;">Adaugă utilizator</h2>
@@ -34,6 +51,24 @@
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     window.location.href = '/login';
   });
+</script>
+
+<script>
+(async () => {
+  const s = await fetch('/api/settings').then(r => r.json());
+  const engine = s.scraper_engine || 'playwright';
+  document.querySelector(`input[name="scraper_engine"][value="${engine}"]`).checked = true;
+})();
+document.getElementById('btnSaveScraper').addEventListener('click', async () => {
+  const val = document.querySelector('input[name="scraper_engine"]:checked')?.value || 'playwright';
+  const msg = document.getElementById('scraperMessage');
+  msg.style.display = 'none';
+  const r = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scraper_engine: val }), credentials: 'include' });
+  const data = await r.json().catch(() => ({}));
+  msg.style.display = 'block';
+  msg.className = r.ok ? 'p-3 rounded-lg text-sm success-box' : 'p-3 rounded-lg text-sm error-box';
+  msg.textContent = r.ok ? 'Motor salvat: ' + (val === 'playwright' ? 'Playwright' : 'Beautiful Soup') : (data.detail || data.error || 'Eroare');
+});
 </script>
 
 <script>

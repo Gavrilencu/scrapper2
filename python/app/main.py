@@ -10,7 +10,7 @@ from app.config import DATA_DIR, DB_PATH
 from app.database import init_db
 from app.auth import get_session_from_cookie, get_session_cookie_name
 from app.scheduler import start_scheduler
-from app.routers import api_auth, api_connections, api_jobs, api_email, api_scrape, api_scheduler
+from app.routers import api_auth, api_connections, api_jobs, api_email, api_scrape, api_scheduler, api_settings
 
 app = FastAPI(title="Scrapper Pro")
 
@@ -24,6 +24,7 @@ app.include_router(api_jobs.router)
 app.include_router(api_email.router)
 app.include_router(api_scrape.router)
 app.include_router(api_scheduler.router)
+app.include_router(api_settings.router)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
