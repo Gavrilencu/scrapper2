@@ -165,3 +165,11 @@ async def settings_page(request: Request):
     if not session:
         return RedirectResponse("/login", status_code=302)
     return templates.TemplateResponse("settings.html", {"request": request, "user": session})
+
+
+@app.get("/testing")
+async def testing_page(request: Request):
+    session = get_session(request)
+    if not session:
+        return RedirectResponse("/login", status_code=302)
+    return templates.TemplateResponse("testing.html", {"request": request, "user": session})

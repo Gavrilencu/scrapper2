@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Testare extragere - Scrapper Pro{% endblock %}
+{% block content %}
+<a href="/" class="link mb-6" style="display:inline-flex;align-items:center;gap:0.5rem;">← Înapoi</a>
+<h1 class="text-white mb-2" style="font-size:1.875rem;font-weight:700;">Testare extragere</h1>
+<p class="text-muted mb-8">Introdu URL-ul și selectorul (XPath sau CSS), alege metoda și rulează. Vezi pe ecran valorile extrase.</p>
+
+<div class="card mb-6">
+  <h2 class="text-white mb-4" style="font-size:1.125rem;font-weight:600;">Parametri</h2>
+  <div class="space-y-4">
+    <div>
+      <label class="label">URL pagină</label>
+      <input id="testUrl" class="input font-mono" type="url" placeholder="https://example.com/pagina" required>
+    </div>
+    <div>
+      <label class="label">Selector (XPath sau CSS)</label>
+      <input id="testSelector" class="input font-mono" placeholder="ex: //h1/text() sau div.title sau //span[@class='pret']" required>
+      <p class="text-muted mt-1" style="font-size:0.75rem;">XPath: începe cu / sau (.  CSS: ex. div.clasa, #id, table td.</p>
+    </div>
+    <div>
+      <label class="label">Metodă</label>
+      <select id="testMethod" class="input" style="max-width:20rem;">
+        <option value="playwright">Playwright (JavaScript + XPath și CSS)</option>
+        <option value="lxml">Lxml (HTML static, XPath și CSS)</option>
+        <option value="beautifulsoup">Beautiful Soup (HTML static, doar CSS)</option>
+      </select>
+      <p class="text-muted mt-1" style="font-size:0.75rem;">Playwright: rulează JS, mai lent. Lxml/BS4: doar HTML descărcat, mai rapid. BS4 nu suportă XPath.</p>
+    </div>
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+      <input type="checkbox" id="testUseProxy">
+      <span class="text-muted">Folosește proxy global (din Setări)</span>
+    </label>
+  </div>
+  <div class="mt-4">
+    <button type="button" id="btnRunTest" class="btn btn-primary">Rulează test</button>
+  </div>
+</div>
+
+<div id="testError" class="error-box mb-6" style="display:none;"></div>
+
+<div id="testResult" class="card" style="display:none;">
+  <h2 class="text-white mb-3" style="font-size:1.125rem;font-weight:600;">Rezultat</h2>
+  <p class="text-muted mb-2" style="font-size:0.875rem;"><span id="resultMethod"></span> · <span id="resultCount"></span> valoare(i) găsite</p>
+  <div id="resultValues" class="font-mono" style="background:#0f172a;border:1px solid #334155;border-radius:0.5rem;padding:1rem;max-height:20rem;overflow:auto;white-space:pre-wrap;word-break:break-all;"></div>
+</div>
+
+<script>
+(function() {
+  const urlEl = document.getElementById('testUrl');
+  const selectorEl = document.getElementById('testSelector');
+  const methodEl = document.getElementById('testMethod');
+  const useProxyEl = document.getElementById('testUseProxy');
+  const btnRun = document.getElementById('btnRunTest');
+  const errorEl = document.getElementById('testError');
+  const resultCard = document.getElementById('testResult');
+  const resultMethod = document.getElementById('resultMethod');
+  const resultCount = document.getElementById('resultCount');
+  const resultValues = document.getElementById('resultValues');
+
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : s;
+    return d.innerHTML;
+  }
+
+  btnRun.addEventListener('click', async () => {
+    const url = (urlEl.value || '').trim();
+    const selector = (selectorEl.value || '').trim();
+    if (!url || !selector) {
+      errorEl.textContent = 'Completează URL și selector.';
+      errorEl.style.display = 'block';
+      resultCard.style.display = 'none';
+      return;
+    }
+    errorEl.style.display = 'none';
+    btnRun.disabled = true;
+    btnRun.textContent = 'Se rulează...';
+    try {
+      const r = await fetch('/api/scrape/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          url: url,
+          selector: selector,
+          method: methodEl.value,
+          use_proxy: useProxyEl.checked
+        })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        errorEl.textContent = data.detail || data.message || 'Eroare la request.';
+        errorEl.style.display = 'block';
+        resultCard.style.display = 'none';
+        return;
+      }
+      resultCard.style.display = 'block';
+      resultMethod.textContent = 'Metodă: ' + (data.method || '');
+      resultCount.textContent = (data.count ?? 0) + ' valoare(i) găsite';
+      const values = data.values || [];
+      if (values.length === 0) {
+        resultValues.textContent = '(nicio valoare extrasă – verifică selectorul și metoda)';
+      } else {
+        resultValues.textContent = values.map((v, i) => `[${i + 1}] ${v}`).join('\n\n');
+      }
+    } catch (err) {
+      errorEl.textContent = err.message || 'Eroare de rețea.';
+      errorEl.style.display = 'block';
+      resultCard.style.display = 'none';
+    } finally {
+      btnRun.disabled = false;
+      btnRun.textContent = 'Rulează test';
+    }
+  });
+})();
+</script>
+{% endblock %}

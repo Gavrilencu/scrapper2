@@ -19,6 +19,7 @@
         <a href="/jobs" class="{% if request.url.path.startswith('/jobs') %}active{% endif %}">Job-uri</a>
         <a href="/email" class="{% if request.url.path.startswith('/email') %}active{% endif %}">Configurare Email</a>
         <a href="/runs" class="{% if request.url.path == '/runs' %}active{% endif %}">Istoric rulări</a>
+        <a href="/testing" class="{% if request.url.path == '/testing' %}active{% endif %}">Testare extragere</a>
         <a href="/documentatie" class="{% if request.url.path == '/documentatie' %}active{% endif %}">Documentație</a>
         <a href="/settings" class="{% if request.url.path == '/settings' %}active{% endif %}">Setări</a>
       </nav>
