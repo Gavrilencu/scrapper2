@@ -1,12 +1,14 @@
 """
-Scraper cu lxml – XPath și CSS pe HTML static (fără JavaScript).
-Potrivit pentru pagini care nu depind de JS.
+Scraper cu lxml – XPath (etree.HTML) și tabele (BeautifulSoup+lxml), fetch cu httpx.
+Motor: scraper_engine (fetch_html, extract_table, XPath cu fallbacks).
 """
 import json
 import re
 from typing import Any
-import requests
-from lxml import html, cssselect
+
+from lxml import etree, cssselect
+
+from app.scraper_engine import fetch_html, extract_table as engine_extract_table
 
 
 def _is_xpath(selector: str) -> bool:
@@ -14,28 +16,11 @@ def _is_xpath(selector: str) -> bool:
     return s.startswith("/") or s.startswith("(.") or s.lower().startswith("xpath=")
 
 
-def _apply_proxy_to_server(server: str, username: str | None, password: str | None) -> str:
-    if not username or not password:
-        return server
-    if "://" in server:
-        scheme, rest = server.split("://", 1)
-    else:
-        scheme, rest = "http", server
-    return f"{scheme}://{username}:{password}@{rest}"
-
-
 def _get_tree(url: str, proxy: dict | None = None):
-    headers = {"User-Agent": "ScrapperPro/1.0 (Lxml)"}
-    kwargs: dict[str, Any] = {"timeout": 30, "headers": headers}
-    if proxy and proxy.get("server"):
-        server = proxy["server"]
-        server_with_auth = _apply_proxy_to_server(
-            server, proxy.get("username"), proxy.get("password")
-        )
-        kwargs["proxies"] = {"http": server_with_auth, "https": server_with_auth}
-    resp = requests.get(url, **kwargs)
-    resp.raise_for_status()
-    return html.fromstring(resp.content)
+    """Descarcă HTML cu httpx și parsează cu etree.HTML (ca în motorul de scraping)."""
+    html_content = fetch_html(url, proxy=proxy, timeout=30.0)
+    doc = etree.HTML(html_content)
+    return doc if doc is not None else etree.fromstring(b"<html/>")
 
 
 def _xpath_without_tbody(xpath: str) -> str:
@@ -104,8 +89,11 @@ def _nodes_for_selector(root, selector: str):
 
 
 def _text_from_node(node) -> str:
+    """Extrage text din nod (itertext ca în motorul de scraping)."""
     if node is None:
         return ""
+    if hasattr(node, "itertext"):
+        return ("".join(node.itertext())).strip()
     if hasattr(node, "text_content"):
         return (node.text_content() or "").strip()
     if hasattr(node, "nodeValue"):
@@ -154,12 +142,16 @@ def extract_with_config(
     config: dict,
     proxy: dict | None = None,
 ) -> list[dict[str, Any]]:
+    """Extrage date: XPath (etree + fallbacks) și tabele (BeautifulSoup+lxml via engine)."""
     tables_cfg = config.get("tables") or []
     fields_cfg = config.get("fields") or []
     row_selector = (config.get("rowSelector") or "").strip()
 
     all_rows: list[dict[str, Any]] = []
-    tree = _get_tree(url, proxy)
+    html_content = fetch_html(url, proxy=proxy, timeout=30.0)
+    tree = etree.HTML(html_content)
+    if tree is None:
+        tree = etree.fromstring(b"<html/>")
 
     if fields_cfg:
         if row_selector:
@@ -170,7 +162,6 @@ def extract_with_config(
                     sel, var = item.get("selector"), item.get("variable")
                     if not sel or not var:
                         continue
-                    # XPath relativ la rând: dacă e absolut (//) îl facem relativ (.//)
                     sel_use = sel.strip()
                     if _is_xpath(sel) and sel_use.startswith("//"):
                         sel_use = "." + sel_use
@@ -178,7 +169,6 @@ def extract_with_config(
                     if nodes:
                         row[var] = _text_from_node(nodes[0])
                     else:
-                        # încercare din root
                         nodes_root = _nodes_for_selector(tree, item.get("selector") or "")
                         row[var] = _text_from_node(nodes_root[0]) if nodes_root else ""
                 all_rows.append(row)
@@ -192,40 +182,29 @@ def extract_with_config(
                 row[var] = _text_from_node(nodes[0]) if nodes else ""
             all_rows.append(row)
 
+    # Tabele: motorul de scraping (BeautifulSoup + lxml) – extract_table
     for table in tables_cfg:
         selector = (table.get("selector") or "table").strip()
         columns = table.get("columns") or []
         col_map = {c["source"]: c["target"] for c in columns if c.get("source")}
+        table_index = None
+        table_selector = "first"
+        nth_match = re.match(r"table:nth-of-type\((\d+)\)", selector)
+        if nth_match:
+            table_index = int(nth_match.group(1), 10) - 1
+        else:
+            table_selector = selector
         try:
-            el = None
-            nth_match = re.match(r"table:nth-of-type\((\d+)\)", selector)
-            if nth_match:
-                idx = int(nth_match.group(1), 10) - 1
-                tables = tree.xpath("//table")
-                if 0 <= idx < len(tables):
-                    el = tables[idx]
-            if el is None:
-                nodes = _nodes_for_selector(tree, selector)
-                el = nodes[0] if nodes else None
-            if not el:
-                continue
-            trs = el.xpath(".//tr")
-            headers = []
-            ths = el.xpath(".//th")
-            for t in ths:
-                headers.append(_text_from_node(t))
-            if not headers and trs:
-                for c in trs[0].xpath(".//td | .//th"):
-                    headers.append(_text_from_node(c))
-            start = 1 if (headers and trs and trs[0].xpath(".//th")) else 0
-            for i in range(start, len(trs)):
-                row = {}
-                cells = trs[i].xpath(".//td | .//th")
-                for j, cell in enumerate(cells):
-                    src_key = headers[j] if j < len(headers) else f"Col{j}"
-                    key = col_map.get(src_key, src_key)
-                    row[key] = _text_from_node(cell)
-                all_rows.append(row)
+            col_sources = [c["source"] for c in columns if c.get("source")]
+            rows = engine_extract_table(
+                html_content,
+                table_selector=table_selector,
+                columns=col_sources if col_sources else None,
+                table_index=table_index,
+            )
+            for r in rows:
+                out = {col_map.get(k, k): (v or "") for k, v in r.items()}
+                all_rows.append(out)
         except Exception:
             continue
 

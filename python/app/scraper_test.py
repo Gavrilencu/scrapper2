@@ -143,43 +143,24 @@ def test_extract_bs4(url: str, selector: str, proxy: dict | None = None) -> list
 
 
 def test_extract_lxml(url: str, selector: str, proxy: dict | None = None) -> list[str]:
-    """Extrage texte cu lxml – XPath sau CSS pe HTML static (fără JavaScript)."""
-    import requests
-    from lxml import html
+    """Extrage texte cu motorul de scraping: httpx + etree.HTML (XPath) sau CSS (lxml)."""
+    from app.scraper_engine import fetch_html, extract_by_xpath
     from app.scraper_lxml import _xpath_fallbacks_for_table
+    from lxml import etree, cssselect
 
     selector = (selector or "").strip()
     if not selector:
         return []
 
-    headers = {"User-Agent": "ScrapperPro/1.0 (Test)"}
-    kwargs: dict[str, Any] = {"timeout": 30, "headers": headers}
-    if proxy and proxy.get("server"):
-        server = proxy["server"]
-        if proxy.get("username") and proxy.get("password"):
-            server = f"http://{proxy['username']}:{proxy['password']}@{server.replace('http://', '')}"
-        kwargs["proxies"] = {"http": server, "https": server}
-
-    resp = requests.get(url, **kwargs)
-    resp.raise_for_status()
-    tree = html.fromstring(resp.content)
-
-    result: list[str] = []
+    html_content = fetch_html(url, proxy=proxy, timeout=30.0)
+    if _is_xpath(selector):
+        fallbacks = _xpath_fallbacks_for_table(selector)[1:]  # fără prima (originalul)
+        return extract_by_xpath(html_content, selector, xpath_fallbacks=fallbacks or None)
     try:
-        if _is_xpath(selector):
-            nodes = []
-            for xpath_try in _xpath_fallbacks_for_table(selector):
-                nodes = tree.xpath(xpath_try)
-                if nodes:
-                    break
-        else:
-            from lxml import cssselect
-            nodes = cssselect.CSSSelector(selector)(tree)
-        for node in nodes:
-            if hasattr(node, "text_content"):
-                result.append((node.text_content() or "").strip())
-            else:
-                result.append(str(node).strip())
+        doc = etree.HTML(html_content)
+        if doc is None:
+            return []
+        nodes = list(cssselect.CSSSelector(selector)(doc))
+        return [("".join(n.itertext())).strip() if hasattr(n, "itertext") else str(n).strip() for n in nodes]
     except Exception:
-        pass
-    return result
+        return []
