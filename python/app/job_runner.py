@@ -59,7 +59,7 @@ def run_job(job_id: int) -> dict:
         if not job:
             return {"success": False, "rowsInserted": 0, "error": "Job not found"}
 
-            job = dict(job)
+        job = dict(job)
         db_conn = conn.execute(
             "SELECT * FROM connections WHERE id = ?", (job["connection_id"],)
         ).fetchone()
@@ -77,6 +77,8 @@ def run_job(job_id: int) -> dict:
             extraction_config = None
             if job.get("extraction_config"):
                 extraction_config = json.loads(job["extraction_config"])
+            use_proxy = job.get("use_proxy", 0) != 0
+            proxy_cfg = get_proxy_config() if use_proxy else None
             rows = (
                 extract_with_config(job["url"], extraction_config, proxy_cfg)
                 if extraction_config
@@ -94,9 +96,6 @@ def run_job(job_id: int) -> dict:
             before_script = (job.get("before_insert_script") or "").strip()
             insert_script = (job.get("insert_script") or "").strip()
             use_verification = job.get("use_before_insert", 1) != 0
-            use_proxy = job.get("use_proxy", 0) != 0
-
-            proxy_cfg = get_proxy_config() if use_proxy else None
 
             for row_data in rows:
                 row_dict = dict(row_data) if hasattr(row_data, "keys") else row_data
