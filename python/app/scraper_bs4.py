@@ -103,9 +103,10 @@ def extract_with_config(
     if fields_cfg:
         row_selector_css = _css_selector_only(row_selector)
         if row_selector_css:
+            # Caz: avem selector de rânduri (ex: table#id tbody tr)
             row_elems = soup.select(row_selector_css)
             for row_el in row_elems:
-                row = {}
+                row: dict[str, Any] = {}
                 for item in fields_cfg:
                     sel, var = item.get("selector"), item.get("variable")
                     if not sel or not var:
@@ -114,7 +115,8 @@ def extract_with_config(
                     if not css:
                         continue
                     try:
-                        found = row_el.select_one(css)
+                        # Încercăm mai întâi relativ la rând; dacă nu găsim, căutăm global în pagină.
+                        found = row_el.select_one(css) or soup.select_one(css)
                         row[var] = (found.get_text() or "").strip() if found else ""
                     except Exception:
                         row[var] = ""
