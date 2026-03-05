@@ -15,7 +15,9 @@ def send_email(
     subject: str,
     html: str,
     text: str | None = None,
+    use_starttls: bool = True,
 ) -> None:
+    """Trimite email. secure=True → SMTP_SSL (port 465). secure=False, use_starttls=True → SMTP+STARTTLS (587). secure=False, use_starttls=False → SMTP simplu (ex. Exchange pe 5525)."""
     if not text:
         text = re.sub(r"<[^>]*>", "", html)
     msg = MIMEMultipart("alternative")
@@ -24,13 +26,15 @@ def send_email(
     msg["To"] = ", ".join(to_list)
     msg.attach(MIMEText(text, "plain"))
     msg.attach(MIMEText(html, "html"))
+
     if secure:
         with smtplib.SMTP_SSL(host, port) as server:
             server.login(user, password)
             server.sendmail(from_addr, to_list, msg.as_string())
     else:
         with smtplib.SMTP(host, port) as server:
-            server.starttls()
+            if use_starttls:
+                server.starttls()
             server.login(user, password)
             server.sendmail(from_addr, to_list, msg.as_string())
 

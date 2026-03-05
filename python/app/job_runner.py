@@ -173,6 +173,7 @@ def run_job(job_id: int) -> dict:
                                     html=build_job_error_email(
                                         job["name"], error_message, datetime.utcnow().isoformat()
                                     ),
+                                    use_starttls=bool(ec.get("use_starttls", 1)),
                                 )
                         except Exception:
                             pass
@@ -205,6 +206,7 @@ def run_job(job_id: int) -> dict:
                         html=build_job_success_email(
                             job["name"], rows_inserted, datetime.utcnow().isoformat()
                         ),
+                        use_starttls=bool(ec.get("use_starttls", 1)),
                     )
 
             return {"success": True, "rowsInserted": rows_inserted}
@@ -242,6 +244,7 @@ def run_job(job_id: int) -> dict:
                             html=build_job_error_email(
                                 job["name"], error_message, datetime.utcnow().isoformat()
                             ),
+                            use_starttls=bool(ec.get("use_starttls", 1)),
                         )
                 except Exception:
                     pass

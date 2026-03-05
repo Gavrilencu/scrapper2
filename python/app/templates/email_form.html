@@ -26,6 +26,10 @@
       <input type="checkbox" name="secure">
       <span class="text-muted">SSL/TLS (port 465)</span>
     </label>
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+      <input type="checkbox" name="use_starttls" checked>
+      <span class="text-muted">Folosește STARTTLS (debifat pentru Exchange/internal SMTP, ex. port 5525)</span>
+    </label>
     <div class="grid-2">
       <div>
         <label class="label">Utilizator</label>
@@ -56,6 +60,7 @@ const configId = {{ config_id if config_id is not none else 'null' }};
     document.querySelector('[name=host]').value = c.host;
     document.querySelector('[name=port]').value = c.port || 587;
     document.querySelector('[name=secure]').checked = !!c.secure;
+    document.querySelector('[name=use_starttls]').checked = c.use_starttls !== 0;
     document.querySelector('[name=user_name]').value = c.user_name;
     document.querySelector('[name=from_address]').value = c.from_address;
   }
@@ -63,7 +68,7 @@ const configId = {{ config_id if config_id is not none else 'null' }};
 document.getElementById('form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
-  const body = { name: form.name.value, host: form.host.value, port: parseInt(form.port.value, 10) || 587, secure: form.secure.checked, user_name: form.user_name.value, from_address: form.from_address.value };
+  const body = { name: form.name.value, host: form.host.value, port: parseInt(form.port.value, 10) || 587, secure: form.secure.checked, use_starttls: form.use_starttls.checked, user_name: form.user_name.value, from_address: form.from_address.value };
   if (form.password.value) body.password = form.password.value;
   const url = configId ? `/api/email-config/${configId}` : '/api/email-config';
   const method = configId ? 'PUT' : 'POST';

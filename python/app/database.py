@@ -94,6 +94,14 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE jobs ADD COLUMN scraper_engine TEXT DEFAULT 'playwright'")
         except Exception:
             pass
+        # email_config: use_starttls (0 = SMTP simplu, ex. Exchange pe 5525)
+        try:
+            cur = conn.execute("PRAGMA table_info(email_config)")
+            cols_email = [row[1] for row in cur.fetchall()]
+            if "use_starttls" not in cols_email:
+                conn.execute("ALTER TABLE email_config ADD COLUMN use_starttls INTEGER DEFAULT 1")
+        except Exception:
+            pass
         # Default: motor scraping = playwright
         conn.execute(
             "INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)",
