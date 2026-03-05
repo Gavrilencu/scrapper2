@@ -1,5 +1,6 @@
 import re
 import json
+import traceback
 from datetime import datetime
 from app.database import get_db, get_setting
 from app.oracle_client import build_connect_string, run_script
@@ -125,7 +126,9 @@ def run_job(job_id: int) -> dict:
                 except Exception as e:
                     # Eroare la acest rând – logăm și includem valorile variabilelor + ultimul SQL
                     row_json = json.dumps(row_dict, ensure_ascii=False)
-                    base_msg = str(e)
+                    base_msg = (str(e) or "").strip() or repr(e) or "Eroare necunoscută"
+                    if not (str(e) or "").strip():
+                        base_msg = f"{type(e).__name__}: {base_msg}"
                     if current_sql:
                         error_message = f"{base_msg} | ROW={row_json} | SQL={current_sql}"
                     else:
@@ -194,7 +197,11 @@ def run_job(job_id: int) -> dict:
             return {"success": True, "rowsInserted": rows_inserted}
 
         except Exception as err:
-            error_message = str(err)
+            raw = (str(err) or "").strip()
+            error_message = raw or repr(err) or "Eroare necunoscută"
+            if not raw:
+                error_message = f"{type(err).__name__}: {error_message}"
+            traceback.print_exc()
             conn.execute(
                 "UPDATE job_runs SET finished_at = CURRENT_TIMESTAMP, status = ?, error_message = ? WHERE id = ?",
                 ("error", error_message, run_id),
