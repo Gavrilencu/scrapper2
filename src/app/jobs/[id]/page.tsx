@@ -321,6 +321,7 @@ export default function EditJobPage() {
 
         <div className="card space-y-4">
           <h2 className="text-lg font-semibold text-white">Script inserare</h2>
+          <p className="text-slate-400 text-sm">Variabile: {`{{nume_coloană}}`}. Data/ora: {`{{now_yyyy_mm_dd}}`}, {`{{now_dd_mm_yyyy}}`}, {`{{now_dd_mm_yyyy_hh_mi_ss}}`}, {`{{now_yyyy_mm_dd_hh_mi_ss}}`}, {`{{now_time}}`}.</p>
           <textarea className="input font-mono text-sm min-h-[120px]" value={insert_script} onChange={(e) => setInsertScript(e.target.value)} placeholder="INSERT INTO ..." />
         </div>
 

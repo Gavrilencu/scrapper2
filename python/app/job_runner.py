@@ -11,9 +11,25 @@ from app.email_sender import (
 )
 
 
+def get_datetime_placeholders(dt: datetime | None = None) -> dict[str, str]:
+    """Returnează placeholdere pentru data/ora curentă, folosibile în scripturi cu {{nume}}."""
+    if dt is None:
+        dt = datetime.now()
+    return {
+        "now_yyyy_mm_dd": dt.strftime("%Y-%m-%d"),
+        "now_dd_mm_yyyy": dt.strftime("%d.%m.%Y"),
+        "now_dd_mm_yyyy_hh_mi_ss": dt.strftime("%d.%m.%Y %H:%M:%S"),
+        "now_yyyy_mm_dd_hh_mi_ss": dt.strftime("%Y-%m-%d %H:%M:%S"),
+        "now_time": dt.strftime("%H:%M:%S"),
+        "now_ora": dt.strftime("%H:%M:%S"),
+    }
+
+
 def substitute_in_script(script: str, row: dict) -> str:
+    dt_placeholders = get_datetime_placeholders()
+    combined = {**row, **dt_placeholders}
     out = script
-    for key, value in row.items():
+    for key, value in combined.items():
         safe = str(value).replace("'", "''") if value is not None else ""
         out = re.sub(r"\{\{\s*" + re.escape(key) + r"\s*\}\}", safe, out, flags=re.IGNORECASE)
         out = re.sub(rf":{re.escape(key)}\b", f"'{safe}'", out, flags=re.IGNORECASE)

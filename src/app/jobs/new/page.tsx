@@ -315,12 +315,12 @@ export default function NewJobPage() {
 
         <div className="card space-y-4">
           <h2 className="text-lg font-semibold text-white">Script inserare</h2>
-          <p className="text-slate-400 text-sm">Folosește {`{{nume_coloană}}`} sau :nume_coloană pentru valorile extrase. Ex: INSERT INTO t (a,b) VALUES ({`'{{a}}','{{b}}'`})</p>
+          <p className="text-slate-400 text-sm">Folosește {`{{nume_coloană}}`} sau :nume_coloană pentru valorile extrase. Data/ora: {`{{now_yyyy_mm_dd}}`} (an-lună-zi), {`{{now_dd_mm_yyyy}}`} (zi.lună.an), {`{{now_dd_mm_yyyy_hh_mi_ss}}`} (zi.lună.an oră:min:sec), {`{{now_yyyy_mm_dd_hh_mi_ss}}`}, {`{{now_time}}`}.</p>
           <textarea
             className="input font-mono text-sm min-h-[120px]"
             value={insert_script}
             onChange={(e) => setInsertScript(e.target.value)}
-            placeholder="INSERT INTO mytable (col1, col2) VALUES ('{{col1}}', '{{col2}}')"
+            placeholder="INSERT INTO mytable (col1, data_inserare) VALUES ('{{col1}}', '{{now_yyyy_mm_dd_hh_mi_ss}}')"
           />
         </div>
 

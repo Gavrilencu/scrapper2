@@ -4,9 +4,30 @@ import { extractWithConfig } from './scraper';
 import { sendEmail, buildJobSuccessEmail, buildJobErrorEmail } from './email';
 import type { ExtractionConfig } from './scraper';
 
+/** Placeholdere pentru data/ora curentă, folosibile în scripturi cu {{nume}}. */
+function getDatetimePlaceholders(date: Date = new Date()): Record<string, string> {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const y = date.getFullYear();
+  const m = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const h = pad(date.getHours());
+  const mi = pad(date.getMinutes());
+  const s = pad(date.getSeconds());
+  return {
+    now_yyyy_mm_dd: `${y}-${m}-${d}`,
+    now_dd_mm_yyyy: `${d}.${m}.${y}`,
+    now_dd_mm_yyyy_hh_mi_ss: `${d}.${m}.${y} ${h}:${mi}:${s}`,
+    now_yyyy_mm_dd_hh_mi_ss: `${y}-${m}-${d} ${h}:${mi}:${s}`,
+    now_time: `${h}:${mi}:${s}`,
+    now_ora: `${h}:${mi}:${s}`,
+  };
+}
+
 function substituteInScript(script: string, row: Record<string, unknown>): string {
+  const dtPlaceholders = getDatetimePlaceholders();
+  const combined = { ...row, ...dtPlaceholders };
   let out = script;
-  for (const [key, value] of Object.entries(row)) {
+  for (const [key, value] of Object.entries(combined)) {
     const safe = typeof value === 'string' ? value.replace(/'/g, "''") : String(value ?? '');
     out = out.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi'), safe);
     out = out.replace(new RegExp(`:${key}\\b`, 'gi'), `'${safe}'`);
